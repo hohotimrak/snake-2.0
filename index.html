@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snake Survival</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0f0f2a 100%);
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 8px;
+            box-shadow: 0 0 60px rgba(0, 255, 255, 0.1), 
+                        0 0 100px rgba(138, 43, 226, 0.1),
+                        inset 0 0 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, rgba(20, 20, 50, 0.95) 0%, rgba(5, 5, 20, 0.98) 100%);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2rem, 8vw, 4rem);
+            font-weight: 900;
+            background: linear-gradient(180deg, #00ffff 0%, #0088ff 50%, #8a2be2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(0, 255, 255, 0.5);
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: clamp(0.9rem, 3vw, 1.3rem);
+            color: #88aaff;
+            letter-spacing: 8px;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .menu-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            padding: 15px 50px;
+            margin: 10px;
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            background: linear-gradient(180deg, rgba(0, 100, 150, 0.3) 0%, rgba(0, 50, 100, 0.2) 100%);
+            color: #00ffff;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            min-width: 250px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .menu-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .menu-btn:hover::before {
+            left: 100%;
+        }
+
+        .menu-btn:hover {
+            border-color: rgba(0, 255, 255, 0.8);
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.4),
+                        inset 0 0 20px rgba(0, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .menu-btn:active {
+            transform: translateY(0);
+        }
+
+        .stats-panel {
+            background: rgba(0, 30, 60, 0.6);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 25px 40px;
+            margin: 20px;
+            min-width: 300px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #88aaff;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .stat-value {
+            color: #00ffff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .hud-item {
+            background: rgba(0, 20, 40, 0.7);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .hud-label {
+            font-size: 0.8rem;
+            color: #88aaff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .hud-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem;
+            color: #00ffff;
+            font-weight: 700;
+        }
+
+        .health-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(255, 100, 100, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ff6666, #ff8888);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 100, 100, 0.5);
+        }
+
+        .xp-bar {
+            width: 150px;
+            height: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(138, 43, 226, 0.5);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .xp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8a2be2, #9932cc, #ba55d3);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 15px rgba(138, 43, 226, 0.5);
+        }
+
+        /* Upgrade Cards */
+        .upgrade-screen {
+            background: radial-gradient(ellipse at center, rgba(30, 20, 50, 0.98) 0%, rgba(10, 5, 30, 0.99) 100%);
+        }
+
+        .upgrade-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            color: #00ffff;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        }
+
+        .cards-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 1200px;
+            padding: 20px;
+        }
+
+        .upgrade-card {
+            width: 280px;
+            background: linear-gradient(180deg, rgba(20, 40, 80, 0.8) 0%, rgba(10, 20, 50, 0.9) 100%);
+            border: 2px solid rgba(138, 43, 226, 0.4);
+            border-radius: 16px;
+            padding: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upgrade-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #00ffff, #8a2be2, #ff00ff);
+        }
+
+        .upgrade-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            border-color: rgba(0, 255, 255, 0.8);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5),
+                        0 0 40px rgba(138, 43, 226, 0.3);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .card-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            color: #00ffff;
+            text-align: center;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .card-description {
+            font-size: 0.95rem;
+            color: #aaccff;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .card-rarity {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 0.7rem;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .rarity-common {
+            background: rgba(100, 150, 200, 0.3);
+            color: #6496c8;
+            border: 1px solid rgba(100, 150, 200, 0.5);
+        }
+
+        .rarity-rare {
+            background: rgba(138, 43, 226, 0.3);
+            color: #ba55d3;
+            border: 1px solid rgba(138, 43, 226, 0.5);
+        }
+
+        .rarity-legendary {
+            background: rgba(255, 215, 0, 0.3);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+        }
+
+        /* Mobile Controls */
+        .mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 15px;
+            z-index: 5;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(0, 100, 150, 0.4);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            color: #00ffff;
+            font-size: 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .control-btn:active {
+            background: rgba(0, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: flex;
+            }
+            
+            .hud-item {
+                padding: 5px 10px;
+            }
+            
+            .hud-value {
+                font-size: 1.1rem;
+            }
+            
+            .health-bar {
+                width: 120px;
+                height: 15px;
+            }
+            
+            .xp-bar {
+                width: 100px;
+                height: 10px;
+            }
+        }
+
+        /* Particles and Effects */
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Loading Screen */
+        .loader {
+            width: 200px;
+            height: 4px;
+            background: rgba(0, 100, 150, 0.3);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 30px;
+        }
+
+        .loader-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #8a2be2);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        /* Pause Button */
+        .pause-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            background: rgba(0, 30, 60, 0.7);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            color: #00ffff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        .pause-btn:hover {
+            border-color: rgba(0, 255, 255, 0.8);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Combo Display */
+        .combo-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            color: #ffd700;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+            pointer-events: none;
+            opacity: 0;
+            z-index: 4;
+        }
+
+        .combo-display.active {
+            animation: comboPop 0.5s ease-out;
+        }
+
+        @keyframes comboPop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD -->
+        <div class="hud" id="hud">
+            <div class="hud-left">
+                <div class="hud-item">
+                    <div class="hud-label">Здоровье</div>
+                    <div class="health-bar">
+                        <div class="health-fill" id="healthFill" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="hud-item">
+                    <div class="hud-label">Уровень <span id="levelValue" style="color: #00ffff;">1</span></div>
+                    <div class="xp-bar">
+                        <div class="xp-fill" id="xpFill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="hud-right">
+                <div class="hud-item">
+                    <div class="hud-label">Счёт</div>
+                    <div class="hud-value" id="scoreValue">0</div>
+                </div>
+                <div class="hud-item">
+                    <div class="hud-label">Рекорд</div>
+                    <div class="hud-value" id="bestValue">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combo Display -->
+        <div class="combo-display" id="comboDisplay">x2 COMBO!</div>
+
+        <!-- Pause Button -->
+        <button class="pause-btn" id="pauseBtn" onclick="togglePause()">⏸</button>
+
+        <!-- Main Menu -->
+        <div class="screen" id="mainMenu">
+            <h1 class="title floating">SNAKE SURVIVAL</h1>
+            <p class="subtitle">CYBER EDITION</p>
+            <button class="menu-btn pulse" onclick="startGame()">ИГРАТЬ</button>
+            <button class="menu-btn" onclick="showUpgrades()">ПРОКАЧКА</button>
+            <button class="menu-btn" onclick="showStats()">СТАТИСТИКА</button>
+            <div class="loader">
+                <div class="loader-bar" id="loaderBar"></div>
+            </div>
+        </div>
+
+        <!-- Upgrade Screen -->
+        <div class="screen hidden upgrade-screen" id="upgradeScreen">
+            <h2 class="upgrade-title">ВЫБЕРИТЕ УЛУЧШЕНИЕ</h2>
+            <div class="cards-container" id="upgradeCards">
+                <!-- Cards will be generated here -->
+            </div>
+        </div>
+
+        <!-- Stats Screen -->
+        <div class="screen hidden" id="statsScreen">
+            <h2 class="upgrade-title">СТАТИСТИКА</h2>
+            <div class="stats-panel">
+                <div class="stat-row">
+                    <span class="stat-label">Лучший счёт</span>
+                    <span class="stat-value" id="statBest">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Всего игр</span>
+                    <span class="stat-value" id="statGames">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Всего очков</span>
+                    <span class="stat-value" id="statTotal">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Макс. уровень</span>
+                    <span class="stat-value" id="statMaxLevel">1</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Всего убийств</span>
+                    <span class="stat-value" id="statKills">0</span>
+                </div>
+            </div>
+            <button class="menu-btn" onclick="showMainMenu()">НАЗАД</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div class="screen hidden" id="gameOverScreen">
+            <h2 class="upgrade-title" style="color: #ff4444;">ИГРА ОКОНЧЕНА</h2>
+            <div class="stats-panel">
+                <div class="stat-row">
+                    <span class="stat-label">Счёт</span>
+                    <span class="stat-value" id="finalScore">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Рекорд</span>
+                    <span class="stat-value" id="finalBest">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Уровень</span>
+                    <span class="stat-value" id="finalLevel">1</span>
+                </div>
+            </div>
+            <button class="menu-btn pulse" onclick="startGame()">ЕЩЁ РАЗ</button>
+            <button class="menu-btn" onclick="showMainMenu()">МЕНЮ</button>
+        </div>
+
+        <!-- Pause Screen -->
+        <div class="screen hidden" id="pauseScreen">
+            <h2 class="upgrade-title">ПАУЗА</h2>
+            <button class="menu-btn pulse" onclick="togglePause()">ПРОДОЛЖИТЬ</button>
+            <button class="menu-btn" onclick="showMainMenu()">МЕНЮ</button>
+        </div>
+
+        <!-- Mobile Controls -->
+        <div class="mobile-controls" id="mobileControls">
+            <div class="control-btn" ontouchstart="setDirection('left')" onmousedown="setDirection('left')">←</div>
+            <div class="control-btn" ontouchstart="setDirection('up')" onmousedown="setDirection('up')">↑</div>
+            <div class="control-btn" ontouchstart="setDirection('down')" onmousedown="setDirection('down')">↓</div>
+            <div class="control-btn" ontouchstart="setDirection('right')" onmousedown="setDirection('right')">→</div>
+        </div>
+    </div>
+
+    <script src="https://yandex.ru/games/sdk/v2"></script>
+    <script src="game.js"></script>
+</body>
+</html>
