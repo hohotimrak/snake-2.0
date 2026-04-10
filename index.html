@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Snake Survival: Neon Arena</title>
+    <title>Snake Survival: Fantasy Quest</title>
     <script src="https://yandex.ru/games/sdk/v2"></script>
     <style>
         * {
@@ -14,27 +14,16 @@
         }
 
         body {
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #1a472a 0%, #2d5a3f 50%, #1a472a 100%);
             overflow: hidden;
             touch-action: none;
-            color: #fff;
-        }
-
-        #gameContainer {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            user-select: none;
         }
 
         #gameCanvas {
-            border-radius: 12px;
-            box-shadow: 0 0 60px rgba(0, 255, 255, 0.3), 
-                        0 0 100px rgba(138, 43, 226, 0.2);
-            background: rgba(10, 10, 30, 0.95);
+            display: block;
+            background: #2d5a3f;
         }
 
         .ui-overlay {
@@ -44,68 +33,63 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px;
         }
 
-        .hud-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            pointer-events: auto;
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+            font-size: 18px;
+            z-index: 10;
         }
 
-        .score-panel {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 15px 25px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .score-label {
-            font-size: 12px;
-            color: #aaa;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+        .hud div {
             margin-bottom: 5px;
+            background: rgba(0, 50, 0, 0.6);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 2px solid #4a7c59;
+            display: inline-block;
         }
 
-        .score-value {
-            font-size: 28px;
-            font-weight: bold;
-            background: linear-gradient(45deg, #00ffff, #ff00ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        .compass {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, rgba(0, 80, 0, 0.8) 0%, rgba(0, 40, 0, 0.9) 100%);
+            border: 3px solid #6b8e5c;
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(100, 180, 100, 0.5);
         }
 
-        .level-indicator {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 15px 25px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: right;
+        .compass-arrow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 30px;
+            background: linear-gradient(to top, #ff6b6b, #ffd93d);
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%) rotate(0deg);
+            border-radius: 2px 2px 0 0;
+            transition: transform 0.1s ease-out;
         }
 
-        .level-bar {
-            width: 150px;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            overflow: hidden;
-            margin-top: 8px;
-        }
-
-        .level-progress {
-            height: 100%;
-            background: linear-gradient(90deg, #00ffff, #ff00ff);
-            border-radius: 4px;
-            transition: width 0.3s ease;
+        .compass-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            background: #ffd93d;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            border: 2px solid #fff;
         }
 
         .menu-screen {
@@ -114,289 +98,221 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(15, 12, 41, 0.95);
-            backdrop-filter: blur(20px);
+            background: linear-gradient(135deg, rgba(20, 60, 30, 0.95) 0%, rgba(30, 80, 50, 0.95) 100%);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            pointer-events: auto;
             z-index: 100;
+            pointer-events: auto;
         }
 
         .menu-title {
             font-size: 48px;
-            font-weight: bold;
-            background: linear-gradient(45deg, #00ffff, #ff00ff, #00ffff);
-            background-size: 300% 300%;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: gradientShift 3s ease infinite;
-            margin-bottom: 10px;
+            color: #ffd93d;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 20px rgba(255, 217, 61, 0.5);
+            margin-bottom: 20px;
             text-align: center;
-        }
-
-        @keyframes gradientShift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
+            font-weight: bold;
+            letter-spacing: 2px;
         }
 
         .menu-subtitle {
-            font-size: 18px;
-            color: #888;
+            font-size: 20px;
+            color: #90ee90;
             margin-bottom: 40px;
             text-align: center;
         }
 
         .menu-btn {
-            background: linear-gradient(45deg, #667eea, #764ba2);
-            border: none;
-            padding: 18px 60px;
-            font-size: 20px;
-            color: white;
-            border-radius: 50px;
+            background: linear-gradient(180deg, #4a7c59 0%, #2d5a3f 100%);
+            color: #fff;
+            border: 3px solid #6b8e5c;
+            padding: 15px 40px;
+            font-size: 22px;
+            border-radius: 12px;
             cursor: pointer;
             margin: 10px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+            min-width: 250px;
+            text-align: center;
+            transition: all 0.3s;
+            font-family: 'Georgia', serif;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
         .menu-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+            background: linear-gradient(180deg, #5a8c69 0%, #3d6a4f 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(100, 180, 100, 0.6);
         }
 
         .menu-btn:active {
             transform: translateY(0);
         }
 
-        .upgrade-panel {
+        .upgrade-screen {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(20px);
-            padding: 40px;
-            border-radius: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 0 100px rgba(0, 255, 255, 0.2);
-            pointer-events: auto;
-            z-index: 200;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(20, 60, 30, 0.95);
             display: none;
-            max-width: 90vw;
-            max-height: 90vh;
-            overflow-y: auto;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 90;
+            pointer-events: auto;
         }
 
         .upgrade-title {
-            font-size: 28px;
-            text-align: center;
+            font-size: 32px;
+            color: #ffd93d;
             margin-bottom: 30px;
-            background: linear-gradient(45deg, #00ffff, #ff00ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
 
         .upgrade-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            display: flex;
             gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
 
         .upgrade-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 255, 255, 0.1);
+            background: linear-gradient(180deg, #3a6c49 0%, #255035 100%);
+            border: 3px solid #6b8e5c;
             border-radius: 15px;
             padding: 20px;
+            width: 220px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
         .upgrade-card:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: #00ffff;
             transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(100, 180, 100, 0.7);
+            border-color: #ffd93d;
         }
 
         .upgrade-icon {
-            font-size: 40px;
-            margin-bottom: 15px;
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 10px;
         }
 
         .upgrade-name {
-            font-size: 16px;
+            font-size: 18px;
+            color: #ffd93d;
+            text-align: center;
+            margin-bottom: 8px;
             font-weight: bold;
-            margin-bottom: 10px;
-            color: #fff;
         }
 
         .upgrade-desc {
-            font-size: 12px;
-            color: #aaa;
+            font-size: 14px;
+            color: #90ee90;
+            text-align: center;
             line-height: 1.4;
         }
 
         .rarity-common { border-color: #888; }
-        .rarity-rare { border-color: #00ffff; box-shadow: 0 0 20px rgba(0, 255, 255, 0.3); }
-        .rarity-epic { border-color: #ff00ff; box-shadow: 0 0 20px rgba(255, 0, 255, 0.3); }
-        .rarity-legendary { 
-            border-color: #ffd700; 
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
-            animation: legendaryGlow 2s ease infinite;
+        .rarity-rare { border-color: #4a90e2; box-shadow: 0 0 15px rgba(74, 144, 226, 0.5); }
+        .rarity-epic { border-color: #a335ee; box-shadow: 0 0 15px rgba(163, 53, 238, 0.5); }
+        .rarity-legendary { border-color: #ffd93d; box-shadow: 0 0 20px rgba(255, 217, 61, 0.7); }
+
+        .pause-menu {
+            display: none;
         }
 
-        @keyframes legendaryGlow {
-            0%, 100% { box-shadow: 0 0 30px rgba(255, 215, 0, 0.5); }
-            50% { box-shadow: 0 0 50px rgba(255, 215, 0, 0.8); }
+        .stats-row {
+            background: rgba(0, 50, 0, 0.7);
+            padding: 15px 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 2px solid #4a7c59;
         }
 
-        .pause-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
+        .stat-item {
+            display: inline-block;
+            margin: 0 15px;
+            color: #fff;
             font-size: 16px;
-            transition: all 0.3s ease;
         }
 
-        .pause-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: #fff;
+        .stat-label {
+            color: #90ee90;
+            font-size: 14px;
         }
 
-        .stats-panel {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 12px;
-            margin-top: 20px;
-            text-align: center;
-        }
-
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            min-width: 300px;
-        }
-
-        .stat-row:last-child {
-            border-bottom: none;
-        }
-
-        .controls-hint {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 12px;
-            color: #888;
-        }
-
-        @media (max-width: 768px) {
+        @media (max-width: 600px) {
             .menu-title { font-size: 32px; }
-            .score-value { font-size: 22px; }
-            .upgrade-cards { grid-template-columns: 1fr; }
-            .controls-hint { display: none; }
+            .menu-btn { min-width: 200px; padding: 12px 30px; font-size: 18px; }
+            .upgrade-card { width: 180px; padding: 15px; }
+            .hud { font-size: 14px; }
+            .compass { width: 60px; height: 60px; }
         }
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <canvas id="gameCanvas"></canvas>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="ui-overlay">
+        <div class="hud" id="hud">
+            <div>🍎 Еда: <span id="scoreDisplay">0</span></div>
+            <div>⭐ Уровень: <span id="levelDisplay">1</span></div>
+            <div>💚 Здоровье: <span id="healthDisplay">100</span>%</div>
+        </div>
         
-        <div class="ui-overlay" id="uiOverlay" style="display: none;">
-            <div class="hud-top">
-                <div class="score-panel">
-                    <div class="score-label">Счёт</div>
-                    <div class="score-value" id="scoreValue">0</div>
-                </div>
-                <div class="level-indicator">
-                    <div class="score-label">Уровень <span id="levelValue">1</span></div>
-                    <div class="level-bar">
-                        <div class="level-progress" id="levelProgress" style="width: 0%"></div>
-                    </div>
-                </div>
-                <button class="pause-btn" id="pauseBtn">⏸️ Пауза</button>
+        <div class="compass" id="compass">
+            <div class="compass-arrow" id="compassArrow"></div>
+            <div class="compass-center"></div>
+        </div>
+    </div>
+
+    <div class="menu-screen" id="mainMenu">
+        <div class="menu-title">🐉 Snake Survival</div>
+        <div class="menu-subtitle">Фэнтези Приключение</div>
+        <div class="stats-row" id="bestStats">
+            <div class="stat-item">
+                <div class="stat-label">Лучший счёт</div>
+                <div id="bestScore">0</div>
             </div>
-            <div class="controls-hint" id="controlsHint">
-                WASD / Стрелки / Свайп для управления
+            <div class="stat-item">
+                <div class="stat-label">Макс уровень</div>
+                <div id="maxLevel">1</div>
             </div>
         </div>
+        <button class="menu-btn" onclick="startGame()">🎮 Начать игру</button>
+        <button class="menu-btn" onclick="showControls()">❓ Управление</button>
+    </div>
 
-        <div class="menu-screen" id="mainMenu">
-            <div class="menu-title">🐍 SNAKE SURVIVAL</div>
-            <div class="menu-subtitle">Neon Arena Edition</div>
-            <button class="menu-btn" id="startBtn">Играть</button>
-            <button class="menu-btn" id="statsBtn">Статистика</button>
-        </div>
+    <div class="menu-screen pause-menu" id="pauseMenu">
+        <div class="menu-title">⏸️ Пауза</div>
+        <button class="menu-btn" onclick="resumeGame()">▶️ Продолжить</button>
+        <button class="menu-btn" onclick="quitToMenu()">🏠 В меню</button>
+    </div>
 
-        <div class="menu-screen" id="statsMenu" style="display: none;">
-            <div class="menu-title">📊 СТАТИСТИКА</div>
-            <div class="stats-panel" id="statsPanel">
-                <div class="stat-row">
-                    <span>Лучший счёт:</span>
-                    <span id="bestScore">0</span>
-                </div>
-                <div class="stat-row">
-                    <span>Всего игр:</span>
-                    <span id="totalGames">0</span>
-                </div>
-                <div class="stat-row">
-                    <span>Всего съедено:</span>
-                    <span id="totalFood">0</span>
-                </div>
-                <div class="stat-row">
-                    <span>Максимальный уровень:</span>
-                    <span id="maxLevel">1</span>
-                </div>
+    <div class="upgrade-screen" id="upgradeScreen">
+        <div class="upgrade-title">✨ Выберите улучшение!</div>
+        <div class="upgrade-cards" id="upgradeCards"></div>
+    </div>
+
+    <div class="menu-screen" id="gameOverScreen" style="display: none;">
+        <div class="menu-title">💀 Игра окончена</div>
+        <div class="stats-row">
+            <div class="stat-item">
+                <div class="stat-label">Счёт</div>
+                <div id="finalScore">0</div>
             </div>
-            <button class="menu-btn" id="backBtn" style="margin-top: 30px;">Назад</button>
-        </div>
-
-        <div class="menu-screen" id="gameOverMenu" style="display: none;">
-            <div class="menu-title">💀 GAME OVER</div>
-            <div class="stats-panel">
-                <div class="stat-row">
-                    <span>Счёт:</span>
-                    <span id="finalScore">0</span>
-                </div>
-                <div class="stat-row">
-                    <span>Уровень:</span>
-                    <span id="finalLevel">1</span>
-                </div>
-                <div class="stat-row">
-                    <span>Рекорд:</span>
-                    <span id="newRecord">Нет</span>
-                </div>
+            <div class="stat-item">
+                <div class="stat-label">Уровень</div>
+                <div id="finalLevel">1</div>
             </div>
-            <button class="menu-btn" id="restartBtn" style="margin-top: 30px;">Играть снова</button>
-            <button class="menu-btn" id="menuBtn">В меню</button>
         </div>
-
-        <div class="upgrade-panel" id="upgradePanel">
-            <div class="upgrade-title">⬆️ ВЫБЕРИ УЛУЧШЕНИЕ</div>
-            <div class="upgrade-cards" id="upgradeCards"></div>
-        </div>
-
-        <div class="menu-screen" id="pauseMenu" style="display: none;">
-            <div class="menu-title">⏸️ ПАУЗА</div>
-            <button class="menu-btn" id="resumeBtn">Продолжить</button>
-            <button class="menu-btn" id="quitBtn">В меню</button>
-        </div>
+        <button class="menu-btn" onclick="startGame()">🔄 Играть снова</button>
+        <button class="menu-btn" onclick="quitToMenu()">🏠 В меню</button>
     </div>
 
     <script src="game.js"></script>

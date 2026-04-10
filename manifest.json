@@ -1,70 +1,50 @@
 {
-    "name": "Snake Survival: Neon Arena",
+    "name": "Snake Survival: Fantasy Quest",
     "version": "1.0.0",
-    "description": "Затягивающая игра в жанре Snake Survival с прокачкой и элементами Vampire Survivors",
-    "author": "Game Developer",
-    "platform": "HTML5",
-    "orientation": "landscape",
-    "resolution": "1920x1080",
-    "fullscreen": true,
-    "controls": ["keyboard", "touch"],
-    "language": "ru",
-    "category": "arcade",
-    "age_rating": "0+",
-    "file_size": "65KB",
-    "load_time": "< 2s",
-    "features": [
-        "Уникальная механика прокачки",
-        "Выбор из 3 улучшений при повышении уровня",
-        "Открытый мир с препятствиями",
-        "Система комбо и множителей очков",
-        "Различные типы еды и powerups",
-        "Адаптивное управление (клавиатура + тач)",
-        "Сохранение прогресса",
-        "Интеграция Yandex Games SDK",
-        "Качественная neon графика",
-        "Система частиц и визуальные эффекты"
+    "description": "Фэнтези змейка с прокачкой как в Vampire Survivors. Собирайте еду, растите, выбирайте улучшения и выживайте как можно дольше!",
+    "author": "Your Name",
+    "license": "MIT",
+    "yandex_game": {
+        "requirements": {
+            "html5": true,
+            "mobile": true,
+            "desktop": true
+        },
+        "orientation": "landscape",
+        "fullscreen": true,
+        "sdk_version": "v2"
+    },
+    "screenshots": [
+        {
+            "src": "screenshot1.png",
+            "type": "image/png",
+            "sizes": "1920x1080"
+        },
+        {
+            "src": "screenshot2.png",
+            "type": "image/png",
+            "sizes": "1920x1080"
+        },
+        {
+            "src": "screenshot3.png",
+            "type": "image/png",
+            "sizes": "1920x1080"
+        }
     ],
-    "requirements": {
-        "browser": "Chrome 80+, Firefox 75+, Safari 13+, Edge 80+",
-        "mobile_support": true,
-        "desktop_support": true,
-        "min_screen_width": 800,
-        "min_screen_height": 600
-    },
-    "monetization": {
-        "ads": true,
-        "ad_provider": "Yandex Games SDK",
-        "ad_placement": "after_game_over"
-    },
-    "save_system": {
-        "local_storage": true,
-        "cloud_save": true,
-        "saved_data": ["stats", "best_score", "total_games", "max_level"]
-    },
-    "gameplay": {
-        "objective": "Собирать еду, избегать препятствий и собственного хвоста, повышать уровень и выбирать улучшения",
-        "controls_desktop": "WASD или стрелки для управления, P или Escape для паузы",
-        "controls_mobile": "Свайпы для управления",
-        "level_up_requirement": "Съесть N единиц еды (растёт с каждым уровнем)",
-        "upgrade_types": [
-            "Ускорение движения",
-            "Магнит для еды",
-            "Увеличение ценности еды",
-            "Частый спавн еды",
-            "Щит от ударов",
-            "Замедление времени",
-            "Двойные очки",
-            "Авто-сбор еды",
-            "Режим призрака",
-            "Расчистка препятствий"
-        ]
-    },
-    "technical": {
-        "canvas_rendering": "2D Context",
-        "animation": "requestAnimationFrame",
-        "responsive": true,
-        "performance_optimized": true,
-        "no_external_assets": true
-    }
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "icon-512.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ],
+    "theme_color": "#1a472a",
+    "background_color": "#2d5a3f",
+    "display": "fullscreen",
+    "start_url": "/index.html"
 }
