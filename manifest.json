@@ -1,21 +1,70 @@
 {
-    "name": "Snake Survival: Cyber Edition",
-    "description": "Динамичная аркадная игра в стиле змейки с элементами выживания и прокачки. Сражайтесь с врагами, собирайте еду и выбирайте улучшения!",
+    "name": "Snake Survival: Neon Arena",
     "version": "1.0.0",
+    "description": "Затягивающая игра в жанре Snake Survival с прокачкой и элементами Vampire Survivors",
+    "author": "Game Developer",
+    "platform": "HTML5",
     "orientation": "landscape",
-    "screen": {
-        "fullscreen": true
-    },
-    "requirements": {
-        "minimumAndroidApiLevel": 21,
-        "minimumIOSVersion": "11.0"
-    },
-    "fileSize": 65000,
-    "ageRating": "0+",
-    "languages": ["ru", "en"],
+    "resolution": "1920x1080",
+    "fullscreen": true,
+    "controls": ["keyboard", "touch"],
+    "language": "ru",
     "category": "arcade",
-    "tags": ["snake", "survival", "arcade", "casual", "retro"],
-    "screenshots": [],
-    "icon": "",
-    "cover": ""
+    "age_rating": "0+",
+    "file_size": "65KB",
+    "load_time": "< 2s",
+    "features": [
+        "Уникальная механика прокачки",
+        "Выбор из 3 улучшений при повышении уровня",
+        "Открытый мир с препятствиями",
+        "Система комбо и множителей очков",
+        "Различные типы еды и powerups",
+        "Адаптивное управление (клавиатура + тач)",
+        "Сохранение прогресса",
+        "Интеграция Yandex Games SDK",
+        "Качественная neon графика",
+        "Система частиц и визуальные эффекты"
+    ],
+    "requirements": {
+        "browser": "Chrome 80+, Firefox 75+, Safari 13+, Edge 80+",
+        "mobile_support": true,
+        "desktop_support": true,
+        "min_screen_width": 800,
+        "min_screen_height": 600
+    },
+    "monetization": {
+        "ads": true,
+        "ad_provider": "Yandex Games SDK",
+        "ad_placement": "after_game_over"
+    },
+    "save_system": {
+        "local_storage": true,
+        "cloud_save": true,
+        "saved_data": ["stats", "best_score", "total_games", "max_level"]
+    },
+    "gameplay": {
+        "objective": "Собирать еду, избегать препятствий и собственного хвоста, повышать уровень и выбирать улучшения",
+        "controls_desktop": "WASD или стрелки для управления, P или Escape для паузы",
+        "controls_mobile": "Свайпы для управления",
+        "level_up_requirement": "Съесть N единиц еды (растёт с каждым уровнем)",
+        "upgrade_types": [
+            "Ускорение движения",
+            "Магнит для еды",
+            "Увеличение ценности еды",
+            "Частый спавн еды",
+            "Щит от ударов",
+            "Замедление времени",
+            "Двойные очки",
+            "Авто-сбор еды",
+            "Режим призрака",
+            "Расчистка препятствий"
+        ]
+    },
+    "technical": {
+        "canvas_rendering": "2D Context",
+        "animation": "requestAnimationFrame",
+        "responsive": true,
+        "performance_optimized": true,
+        "no_external_assets": true
+    }
 }

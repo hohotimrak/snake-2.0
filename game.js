@@ -1,1416 +1,1172 @@
-// Snake Survival - Cyber Edition
-// Complete game logic with Yandex Games SDK integration
+// Snake Survival: Neon Arena - Полная игровая логика
 
-// Game Constants
-const TILE_SIZE = 25;
-const GRID_WIDTH = 32;
-const GRID_HEIGHT = 24;
-const INITIAL_SPEED = 150;
-const MIN_SPEED = 60;
-
-// Game State
-let canvas, ctx;
-let gameState = 'menu'; // menu, playing, paused, upgrade, gameover
-let lastTime = 0;
-let gameTime = 0;
-let gameSpeed = INITIAL_SPEED;
-
-// Player (Snake)
-let snake = [];
-let direction = { x: 1, y: 0 };
-let nextDirection = { x: 1, y: 0 };
-let snakeColor = '#00ffff';
-let snakeGlow = '#0088ff';
-
-// Game Objects
-let foods = [];
-let enemies = [];
-let particles = [];
-let powerups = [];
-let damageNumbers = [];
-
-// Stats
-let score = 0;
-let bestScore = 0;
-let level = 1;
-let xp = 0;
-let xpToNextLevel = 100;
-let health = 100;
-let maxHealth = 100;
-let combo = 1;
-let comboTimer = 0;
-let kills = 0;
-let totalKills = 0;
-
-// Permanent Upgrades
-let permanentUpgrades = {
-    damage: 1,
-    speed: 1,
-    health: 1,
-    magnetRange: 1,
-    luck: 1
-};
-
-// Temporary Upgrades (current run)
-let currentUpgrades = [];
-
-// Upgrade Pool
-const upgradePool = [
-    {
-        id: 'speed_boost',
-        name: 'Ускорение',
-        description: '+15% к скорости движения',
-        icon: '⚡',
-        rarity: 'common',
-        apply: () => {
-            gameSpeed = Math.max(MIN_SPEED, gameSpeed * 0.85);
-        }
-    },
-    {
-        id: 'damage_up',
-        name: 'Сила удара',
-        description: '+25% к урону врагам',
-        icon: '💥',
-        rarity: 'common',
-        apply: () => {
-            permanentUpgrades.damage *= 1.25;
-        }
-    },
-    {
-        id: 'health_max',
-        name: 'Макс. здоровье',
-        description: '+30 к максимальному здоровью',
-        icon: '❤️',
-        rarity: 'common',
-        apply: () => {
-            maxHealth += 30;
-            health = Math.min(health + 30, maxHealth);
-        }
-    },
-    {
-        id: 'heal',
-        name: 'Лечение',
-        description: 'Восстанавливает 50 здоровья',
-        icon: '💚',
-        rarity: 'common',
-        apply: () => {
-            health = Math.min(health + 50, maxHealth);
-        }
-    },
-    {
-        id: 'magnet',
-        name: 'Магнит',
-        description: '+40% радиус притяжения еды',
-        icon: '🧲',
-        rarity: 'rare',
-        apply: () => {
-            permanentUpgrades.magnetRange *= 1.4;
-        }
-    },
-    {
-        id: 'luck',
-        name: 'Удача',
-        description: '+30% шанс редких улучшений',
-        icon: '🍀',
-        rarity: 'rare',
-        apply: () => {
-            permanentUpgrades.luck *= 1.3;
-        }
-    },
-    {
-        id: 'shield',
-        name: 'Щит',
-        description: 'Поглощает 1 удар врага',
-        icon: '🛡️',
-        rarity: 'rare',
-        apply: () => {
-            currentUpgrades.push('shield');
-        }
-    },
-    {
-        id: 'double_xp',
-        name: 'Двойной XP',
-        description: '2x опыт до конца игры',
-        icon: '✨',
-        rarity: 'rare',
-        apply: () => {
-            currentUpgrades.push('double_xp');
-        }
-    },
-    {
-        id: 'ghost',
-        name: 'Призрак',
-        description: 'Проход сквозь стены (30 сек)',
-        icon: '👻',
-        rarity: 'legendary',
-        apply: () => {
-            currentUpgrades.push('ghost');
-            setTimeout(() => {
-                const idx = currentUpgrades.indexOf('ghost');
-                if (idx > -1) currentUpgrades.splice(idx, 1);
-            }, 30000);
-        }
-    },
-    {
-        id: 'invincibility',
-        name: 'Неуязвимость',
-        description: 'Бессмертие на 15 секунд',
-        icon: '⭐',
-        rarity: 'legendary',
-        apply: () => {
-            currentUpgrades.push('invincibility');
-            setTimeout(() => {
-                const idx = currentUpgrades.indexOf('invincibility');
-                if (idx > -1) currentUpgrades.splice(idx, 1);
-            }, 15000);
-        }
-    },
-    {
-        id: 'growth_boost',
-        name: 'Рост силы',
-        description: '+50% к длине змейки',
-        icon: '📈',
-        rarity: 'rare',
-        apply: () => {
-            const growCount = Math.floor(snake.length * 0.5);
-            for (let i = 0; i < growCount; i++) {
-                const tail = snake[snake.length - 1];
-                snake.push({ x: tail.x, y: tail.y });
-            }
-        }
-    },
-    {
-        id: 'score_boost',
-        name: 'Очковый буст',
-        description: '+500 очков мгновенно',
-        icon: '🎯',
-        rarity: 'common',
-        apply: () => {
-            addScore(500);
-        }
-    },
-    {
-        id: 'regen',
-        name: 'Регенерация',
-        description: '+2 здоровья каждую секунду',
-        icon: '💧',
-        rarity: 'rare',
-        apply: () => {
-            currentUpgrades.push('regen');
-        }
-    },
-    {
-        id: 'critical',
-        name: 'Критический удар',
-        description: '10% шанс критического урона (3x)',
-        icon: '🔥',
-        rarity: 'legendary',
-        apply: () => {
-            currentUpgrades.push('critical');
-        }
-    },
-    {
-        id: 'vampire',
-        name: 'Вампиризм',
-        description: '+5 здоровья за убийство врага',
-        icon: '🩸',
-        rarity: 'legendary',
-        apply: () => {
-            currentUpgrades.push('vampire');
-        }
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        
+        // Yandex SDK
+        this.ysdk = null;
+        this.player = null;
+        
+        // Настройки игры
+        this.cellSize = 25;
+        this.gridWidth = 40;
+        this.gridHeight = 30;
+        
+        // Состояние игры
+        this.gameState = 'menu'; // menu, playing, paused, gameover, upgrade
+        this.score = 0;
+        this.level = 1;
+        this.foodEaten = 0;
+        this.foodToLevel = 5;
+        
+        // Змейка
+        this.snake = [];
+        this.direction = { x: 1, y: 0 };
+        this.nextDirection = { x: 1, y: 0 };
+        this.speed = 150;
+        this.lastMove = 0;
+        
+        // Еда и объекты
+        this.foods = [];
+        this.obstacles = [];
+        this.particles = [];
+        this.powerups = [];
+        
+        // Улучшения
+        this.upgrades = {
+            speed: 0,
+            magnetRange: 0,
+            foodValue: 0,
+            foodSpawnRate: 0,
+            obstacleClear: 0,
+            slowMotion: 0,
+            doublePoints: 0,
+            shield: 0,
+            extraLife: 0,
+            foodMagnet: false,
+            autoCollect: false,
+            ghostMode: false,
+            comboMultiplier: 1,
+            maxFoodOnScreen: 0,
+            luckyStrike: 0
+        };
+        
+        // Статистика
+        this.stats = {
+            bestScore: 0,
+            totalGames: 0,
+            totalFood: 0,
+            maxLevel: 1
+        };
+        
+        // Управление
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        
+        // Камера для большого мира
+        this.camera = { x: 0, y: 0 };
+        this.worldWidth = 200;
+        this.worldHeight = 150;
+        
+        this.init();
     }
-];
-
-// Yandex SDK
-let ysdk = null;
-let player = null;
-
-// Initialize Yandex SDK
-function initYandexSDK() {
-    return new Promise((resolve) => {
-        if (window.YaGames) {
-            YaGames.init().then(sdk => {
-                ysdk = sdk;
+    
+    async init() {
+        this.setupCanvas();
+        this.loadStats();
+        this.setupEventListeners();
+        await this.initYandexSDK();
+        this.showMenu();
+        this.gameLoop();
+    }
+    
+    setupCanvas() {
+        const maxSize = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+        const aspectRatio = this.gridWidth / this.gridHeight;
+        
+        if (window.innerWidth > window.innerHeight) {
+            this.canvas.width = Math.min(maxSize * 1.5, 1200);
+            this.canvas.height = this.canvas.width / aspectRatio;
+        } else {
+            this.canvas.height = Math.min(maxSize * 1.2, 800);
+            this.canvas.width = this.canvas.height * aspectRatio;
+        }
+        
+        this.cellSize = this.canvas.width / this.gridWidth;
+    }
+    
+    async initYandexSDK() {
+        try {
+            if (window.YaGames) {
+                this.ysdk = await YaGames.init();
                 console.log('Yandex SDK initialized');
                 
-                // Show loading progress
-                const loaderBar = document.getElementById('loaderBar');
-                if (loaderBar) {
-                    loaderBar.style.width = '50%';
+                // Загрузка сохранений
+                this.loadCloudSave();
+            }
+        } catch (e) {
+            console.log('Yandex SDK not available (development mode)');
+        }
+    }
+    
+    loadCloudSave() {
+        if (this.ysdk && this.ysdk.getPlayer) {
+            this.ysdk.getPlayer().then(player => {
+                this.player = player;
+                return player.getData(['stats', 'upgrades']);
+            }).then(data => {
+                if (data.stats) {
+                    this.stats = { ...this.stats, ...data.stats };
+                    this.updateStatsDisplay();
                 }
-                
-                // Try to get player
-                ysdk.getPlayer().then(_player => {
-                    player = _player;
-                    loadData();
-                    if (loaderBar) loaderBar.style.width = '100%';
-                    resolve(true);
-                }).catch(err => {
-                    console.log('Player not available:', err);
-                    loadLocalData();
-                    if (loaderBar) loaderBar.style.width = '100%';
-                    resolve(false);
-                });
-            }).catch(err => {
-                console.log('Yandex SDK init error:', err);
-                loadLocalData();
-                const loaderBar = document.getElementById('loaderBar');
-                if (loaderBar) loaderBar.style.width = '100%';
-                resolve(false);
+            }).catch(() => {});
+        }
+    }
+    
+    saveCloudData() {
+        if (this.player) {
+            this.player.setData({
+                stats: this.stats,
+                upgrades: this.upgrades
+            }).catch(() => {});
+        }
+    }
+    
+    showAd() {
+        if (this.ysdk) {
+            this.ysdk.adv.showFullscreenAdv({
+                callbacks: {
+                    onClose: () => {
+                        console.log('Ad closed');
+                    },
+                    onError: () => {
+                        console.log('Ad error');
+                    }
+                }
             });
+        }
+    }
+    
+    setupEventListeners() {
+        // Кнопки меню
+        document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+        document.getElementById('statsBtn').addEventListener('click', () => this.showStats());
+        document.getElementById('backBtn').addEventListener('click', () => this.showMenu());
+        document.getElementById('restartBtn').addEventListener('click', () => this.startGame());
+        document.getElementById('menuBtn').addEventListener('click', () => this.showMenu());
+        document.getElementById('resumeBtn').addEventListener('click', () => this.resumeGame());
+        document.getElementById('quitBtn').addEventListener('click', () => this.showMenu());
+        document.getElementById('pauseBtn').addEventListener('click', () => this.pauseGame());
+        
+        // Клавиатура
+        document.addEventListener('keydown', (e) => this.handleKeyPress(e));
+        
+        // Тач управление
+        this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+        this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+        
+        // Ресайз
+        window.addEventListener('resize', () => this.setupCanvas());
+    }
+    
+    handleKeyPress(e) {
+        if (this.gameState !== 'playing') return;
+        
+        switch(e.key) {
+            case 'ArrowUp':
+            case 'w':
+            case 'W':
+                if (this.direction.y !== 1) this.nextDirection = { x: 0, y: -1 };
+                break;
+            case 'ArrowDown':
+            case 's':
+            case 'S':
+                if (this.direction.y !== -1) this.nextDirection = { x: 0, y: 1 };
+                break;
+            case 'ArrowLeft':
+            case 'a':
+            case 'A':
+                if (this.direction.x !== 1) this.nextDirection = { x: -1, y: 0 };
+                break;
+            case 'ArrowRight':
+            case 'd':
+            case 'D':
+                if (this.direction.x !== -1) this.nextDirection = { x: 1, y: 0 };
+                break;
+            case 'Escape':
+            case 'p':
+            case 'P':
+                this.pauseGame();
+                break;
+        }
+    }
+    
+    handleTouchStart(e) {
+        e.preventDefault();
+        const touch = e.touches[0];
+        this.touchStartX = touch.clientX;
+        this.touchStartY = touch.clientY;
+    }
+    
+    handleTouchEnd(e) {
+        e.preventDefault();
+        if (this.gameState !== 'playing') return;
+        
+        const touch = e.changedTouches[0];
+        const dx = touch.clientX - this.touchStartX;
+        const dy = touch.clientY - this.touchStartY;
+        
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 30 && this.direction.x !== -1) {
+                this.nextDirection = { x: 1, y: 0 };
+            } else if (dx < -30 && this.direction.x !== 1) {
+                this.nextDirection = { x: -1, y: 0 };
+            }
         } else {
-            console.log('Yandex SDK not available');
-            loadLocalData();
-            const loaderBar = document.getElementById('loaderBar');
-            if (loaderBar) loaderBar.style.width = '100%';
-            resolve(false);
-        }
-    });
-}
-
-// Save data to Yandex Cloud
-function saveData() {
-    if (player) {
-        player.setData({
-            bestScore: bestScore,
-            totalGames: window.totalGames || 0,
-            totalScore: window.totalScore || 0,
-            maxLevel: window.maxLevel || 1,
-            totalKills: totalKills,
-            permanentUpgrades: permanentUpgrades
-        }).then(() => {
-            console.log('Data saved to cloud');
-        }).catch(err => {
-            console.error('Save error:', err);
-            saveLocalData();
-        });
-    } else {
-        saveLocalData();
-    }
-}
-
-// Load data from Yandex Cloud
-function loadData() {
-    if (player) {
-        player.getData().then(data => {
-            if (data.bestScore !== undefined) bestScore = data.bestScore;
-            if (data.totalGames !== undefined) window.totalGames = data.totalGames;
-            if (data.totalScore !== undefined) window.totalScore = data.totalScore;
-            if (data.maxLevel !== undefined) window.maxLevel = data.maxLevel;
-            if (data.totalKills !== undefined) totalKills = data.totalKills;
-            if (data.permanentUpgrades !== undefined) {
-                Object.assign(permanentUpgrades, data.permanentUpgrades);
-            }
-            updateUI();
-            console.log('Data loaded from cloud');
-        }).catch(err => {
-            console.error('Load error:', err);
-        });
-    }
-}
-
-// Local Storage fallback
-function saveLocalData() {
-    const data = {
-        bestScore: bestScore,
-        totalGames: window.totalGames || 0,
-        totalScore: window.totalScore || 0,
-        maxLevel: window.maxLevel || 1,
-        totalKills: totalKills,
-        permanentUpgrades: permanentUpgrades
-    };
-    localStorage.setItem('snakeSurvivalSave', JSON.stringify(data));
-}
-
-function loadLocalData() {
-    const data = localStorage.getItem('snakeSurvivalSave');
-    if (data) {
-        const parsed = JSON.parse(data);
-        if (parsed.bestScore !== undefined) bestScore = parsed.bestScore;
-        if (parsed.totalGames !== undefined) window.totalGames = parsed.totalGames;
-        if (parsed.totalScore !== undefined) window.totalScore = parsed.totalScore;
-        if (parsed.maxLevel !== undefined) window.maxLevel = parsed.maxLevel;
-        if (parsed.totalKills !== undefined) totalKills = parsed.totalKills;
-        if (parsed.permanentUpgrades !== undefined) {
-            Object.assign(permanentUpgrades, parsed.permanentUpgrades);
-        }
-        updateUI();
-    }
-}
-
-// Show Ad
-function showAd(callback) {
-    if (ysdk) {
-        ysdk.adv.showFullscreenAdv({
-            callbacks: {
-                onClose: function(wasShown) {
-                    if (callback) callback();
-                },
-                onError: function(error) {
-                    console.log('Ad error:', error);
-                    if (callback) callback();
-                }
-            }
-        });
-    } else {
-        if (callback) callback();
-    }
-}
-
-// Canvas Setup
-function setupCanvas() {
-    canvas = document.getElementById('gameCanvas');
-    ctx = canvas.getContext('2d');
-    
-    // Calculate canvas size based on grid
-    const maxWidth = Math.min(window.innerWidth - 40, GRID_WIDTH * TILE_SIZE);
-    const maxHeight = Math.min(window.innerHeight - 150, GRID_HEIGHT * TILE_SIZE);
-    
-    const scale = Math.min(maxWidth / (GRID_WIDTH * TILE_SIZE), maxHeight / (GRID_HEIGHT * TILE_SIZE));
-    
-    canvas.width = GRID_WIDTH * TILE_SIZE * scale;
-    canvas.height = GRID_HEIGHT * TILE_SIZE * scale;
-    
-    ctx.scale(scale, scale);
-    
-    // Handle resize
-    window.addEventListener('resize', () => {
-        const newMaxWidth = Math.min(window.innerWidth - 40, GRID_WIDTH * TILE_SIZE);
-        const newMaxHeight = Math.min(window.innerHeight - 150, GRID_HEIGHT * TILE_SIZE);
-        const newScale = Math.min(newMaxWidth / (GRID_WIDTH * TILE_SIZE), newMaxHeight / (GRID_HEIGHT * TILE_SIZE));
-        
-        canvas.width = GRID_WIDTH * TILE_SIZE * newScale;
-        canvas.height = GRID_HEIGHT * TILE_SIZE * newScale;
-        
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(newScale, newScale);
-    });
-}
-
-// Initialize Game
-function initGame() {
-    snake = [
-        { x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) },
-        { x: Math.floor(GRID_WIDTH / 2) - 1, y: Math.floor(GRID_HEIGHT / 2) },
-        { x: Math.floor(GRID_WIDTH / 2) - 2, y: Math.floor(GRID_HEIGHT / 2) }
-    ];
-    
-    direction = { x: 1, y: 0 };
-    nextDirection = { x: 1, y: 0 };
-    gameSpeed = INITIAL_SPEED / (permanentUpgrades.speed || 1);
-    
-    foods = [];
-    enemies = [];
-    particles = [];
-    powerups = [];
-    damageNumbers = [];
-    currentUpgrades = [];
-    
-    score = 0;
-    level = 1;
-    xp = 0;
-    xpToNextLevel = 100;
-    maxHealth = 100 * (permanentUpgrades.health || 1);
-    health = maxHealth;
-    combo = 1;
-    comboTimer = 0;
-    kills = 0;
-    
-    // Spawn initial food
-    for (let i = 0; i < 5; i++) {
-        spawnFood();
-    }
-    
-    updateUI();
-}
-
-// Spawn Food
-function spawnFood() {
-    let validPosition = false;
-    let x, y;
-    
-    while (!validPosition) {
-        x = Math.floor(Math.random() * GRID_WIDTH);
-        y = Math.floor(Math.random() * GRID_HEIGHT);
-        
-        validPosition = true;
-        
-        // Check collision with snake
-        for (const segment of snake) {
-            if (segment.x === x && segment.y === y) {
-                validPosition = false;
-                break;
-            }
-        }
-        
-        // Check collision with other food
-        for (const food of foods) {
-            if (food.x === x && food.y === y) {
-                validPosition = false;
-                break;
+            if (dy > 30 && this.direction.y !== -1) {
+                this.nextDirection = { x: 0, y: 1 };
+            } else if (dy < -30 && this.direction.y !== 1) {
+                this.nextDirection = { x: 0, y: -1 };
             }
         }
     }
     
-    const types = ['normal', 'normal', 'normal', 'xp', 'powerup'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    
-    let color;
-    let value;
-    
-    switch(type) {
-        case 'xp':
-            color = '#ba55d3';
-            value = 25;
-            break;
-        case 'powerup':
-            color = '#ffd700';
-            value = 50;
-            break;
-        default:
-            color = '#00ff88';
-            value = 10;
-    }
-    
-    foods.push({
-        x, y,
-        color,
-        value,
-        type,
-        pulse: Math.random() * Math.PI * 2
-    });
-}
-
-// Spawn Enemy
-function spawnEnemy() {
-    const side = Math.floor(Math.random() * 4);
-    let x, y, vx, vy;
-    
-    switch(side) {
-        case 0: // Top
-            x = Math.floor(Math.random() * GRID_WIDTH);
-            y = 0;
-            vx = (Math.random() - 0.5) * 2;
-            vy = Math.random() * 2 + 1;
-            break;
-        case 1: // Right
-            x = GRID_WIDTH - 1;
-            y = Math.floor(Math.random() * GRID_HEIGHT);
-            vx = -(Math.random() * 2 + 1);
-            vy = (Math.random() - 0.5) * 2;
-            break;
-        case 2: // Bottom
-            x = Math.floor(Math.random() * GRID_WIDTH);
-            y = GRID_HEIGHT - 1;
-            vx = (Math.random() - 0.5) * 2;
-            vy = -(Math.random() * 2 + 1);
-            break;
-        case 3: // Left
-            x = 0;
-            y = Math.floor(Math.random() * GRID_HEIGHT);
-            vx = Math.random() * 2 + 1;
-            vy = (Math.random() - 0.5) * 2;
-            break;
-    }
-    
-    const enemyTypes = [
-        { color: '#ff4444', speed: 1, damage: 10, size: 1 },
-        { color: '#ff8800', speed: 1.5, damage: 15, size: 0.8 },
-        { color: '#ff00ff', speed: 2, damage: 20, size: 0.6 }
-    ];
-    
-    const difficulty = Math.min(level / 5, 2);
-    const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-    
-    enemies.push({
-        x, y,
-        vx: vx * type.speed * (1 + difficulty * 0.2),
-        vy: vy * type.speed * (1 + difficulty * 0.2),
-        color: type.color,
-        damage: type.damage * (1 + difficulty),
-        size: type.size,
-        health: 30 * (1 + difficulty)
-    });
-}
-
-// Create Particle
-function createParticle(x, y, color, count = 10) {
-    for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
-        const speed = Math.random() * 3 + 2;
-        particles.push({
-            x: x * TILE_SIZE + TILE_SIZE / 2,
-            y: y * TILE_SIZE + TILE_SIZE / 2,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1,
-            decay: Math.random() * 0.03 + 0.02,
-            color,
-            size: Math.random() * 4 + 2
-        });
-    }
-}
-
-// Add Damage Number
-function addDamageNumber(x, y, damage, isCritical = false) {
-    damageNumbers.push({
-        x: x * TILE_SIZE,
-        y: y * TILE_SIZE,
-        damage: damage,
-        life: 1,
-        isCritical
-    });
-}
-
-// Add Score
-function addScore(points) {
-    const finalPoints = Math.floor(points * combo);
-    score += finalPoints;
-    
-    if (finalPoints >= 50) {
-        showCombo();
-    }
-    
-    updateUI();
-}
-
-// Show Combo
-function showCombo() {
-    const comboDisplay = document.getElementById('comboDisplay');
-    comboDisplay.textContent = `x${combo} COMBO!`;
-    comboDisplay.classList.remove('active');
-    void comboDisplay.offsetWidth; // Trigger reflow
-    comboDisplay.classList.add('active');
-}
-
-// Gain XP
-function gainXP(amount) {
-    if (currentUpgrades.includes('double_xp')) {
-        amount *= 2;
-    }
-    
-    xp += amount;
-    
-    while (xp >= xpToNextLevel) {
-        xp -= xpToNextLevel;
-        levelUp();
-    }
-    
-    updateUI();
-}
-
-// Level Up
-function levelUp() {
-    level++;
-    xpToNextLevel = Math.floor(xpToNextLevel * 1.3);
-    
-    // Heal on level up
-    health = Math.min(health + 20, maxHealth);
-    
-    // Show upgrade selection
-    showUpgradeScreen();
-}
-
-// Get Random Upgrades
-function getRandomUpgrades(count = 3) {
-    const available = [...upgradePool];
-    const selected = [];
-    
-    for (let i = 0; i < count && available.length > 0; i++) {
-        // Weight by rarity
-        const weights = available.map(u => {
-            switch(u.rarity) {
-                case 'legendary': return 0.1 * permanentUpgrades.luck;
-                case 'rare': return 0.3 * permanentUpgrades.luck;
-                default: return 0.6;
-            }
-        });
+    startGame() {
+        this.hideAllMenus();
+        document.getElementById('uiOverlay').style.display = 'flex';
         
-        const totalWeight = weights.reduce((a, b) => a + b, 0);
-        let random = Math.random() * totalWeight;
+        // Сброс состояния
+        this.snake = [
+            { x: Math.floor(this.worldWidth / 2), y: Math.floor(this.worldHeight / 2) },
+            { x: Math.floor(this.worldWidth / 2) - 1, y: Math.floor(this.worldHeight / 2) },
+            { x: Math.floor(this.worldWidth / 2) - 2, y: Math.floor(this.worldHeight / 2) }
+        ];
+        this.direction = { x: 1, y: 0 };
+        this.nextDirection = { x: 1, y: 0 };
         
-        let selectedIndex = 0;
-        for (let j = 0; j < weights.length; j++) {
-            random -= weights[j];
-            if (random <= 0) {
-                selectedIndex = j;
-                break;
-            }
-        }
+        this.score = 0;
+        this.level = 1;
+        this.foodEaten = 0;
+        this.foodToLevel = 5;
+        this.speed = 150;
         
-        selected.push(available[selectedIndex]);
-        available.splice(selectedIndex, 1);
-    }
-    
-    return selected;
-}
-
-// Update UI
-function updateUI() {
-    document.getElementById('scoreValue').textContent = score;
-    document.getElementById('bestValue').textContent = bestScore;
-    document.getElementById('levelValue').textContent = level;
-    document.getElementById('healthFill').style.width = `${(health / maxHealth) * 100}%`;
-    document.getElementById('xpFill').style.width = `${(xp / xpToNextLevel) * 100}%`;
-}
-
-// Game Loop
-let lastUpdate = 0;
-function gameLoop(timestamp) {
-    if (gameState !== 'playing') {
-        requestAnimationFrame(gameLoop);
-        return;
-    }
-    
-    const deltaTime = timestamp - lastTime;
-    lastTime = timestamp;
-    gameTime += deltaTime;
-    
-    // Update snake position at fixed intervals
-    if (timestamp - lastUpdate > gameSpeed) {
-        updateSnake();
-        lastUpdate = timestamp;
-    }
-    
-    updateEnemies(deltaTime);
-    updateParticles(deltaTime);
-    updateDamageNumbers(deltaTime);
-    updatePowerups(deltaTime);
-    checkCollisions();
-    render();
-    
-    requestAnimationFrame(gameLoop);
-}
-
-// Update Snake
-function updateSnake() {
-    direction = { ...nextDirection };
-    
-    const head = {
-        x: snake[0].x + direction.x,
-        y: snake[0].y + direction.y
-    };
-    
-    // Wall collision
-    if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
-        if (currentUpgrades.includes('ghost')) {
-            // Wrap around
-            if (head.x < 0) head.x = GRID_WIDTH - 1;
-            if (head.x >= GRID_WIDTH) head.x = 0;
-            if (head.y < 0) head.y = GRID_HEIGHT - 1;
-            if (head.y >= GRID_HEIGHT) head.y = 0;
-        } else {
-            takeDamage(20);
-            // Bounce back
-            direction = { x: -direction.x, y: -direction.y };
-            nextDirection = { ...direction };
-            head.x = snake[0].x + direction.x;
-            head.y = snake[0].y + direction.y;
-        }
-    }
-    
-    // Self collision
-    for (let i = 0; i < snake.length - 1; i++) {
-        if (snake[i].x === head.x && snake[i].y === head.y) {
-            takeDamage(15);
-            direction = { x: -direction.x, y: -direction.y };
-            nextDirection = { ...direction };
-            head.x = snake[0].x + direction.x;
-            head.y = snake[0].y + direction.y;
-            break;
-        }
-    }
-    
-    snake.unshift(head);
-    
-    // Check food collision
-    let ate = false;
-    const magnetRange = 3 * (permanentUpgrades.magnetRange || 1);
-    
-    for (let i = foods.length - 1; i >= 0; i--) {
-        const food = foods[i];
-        const dist = Math.sqrt(Math.pow(head.x - food.x, 2) + Math.pow(head.y - food.y, 2));
-        
-        // Magnet effect
-        if (dist < magnetRange && dist > 1) {
-            food.x += (head.x - food.x) * 0.1;
-            food.y += (head.y - food.y) * 0.1;
-        }
-        
-        if (head.x === Math.round(food.x) && head.y === Math.round(food.y)) {
-            ate = true;
-            addScore(food.value);
-            gainXP(food.value);
-            createParticle(food.x, food.y, food.color);
-            foods.splice(i, 1);
-            spawnFood();
-            
-            // Chance to spawn powerup
-            if (Math.random() < 0.1) {
-                spawnPowerup();
-            }
-        }
-    }
-    
-    if (!ate) {
-        snake.pop();
-    }
-    
-    // Regeneration
-    if (currentUpgrades.includes('regen')) {
-        health = Math.min(health + 0.1, maxHealth);
-        updateUI();
-    }
-}
-
-// Update Enemies
-function updateEnemies(deltaTime) {
-    // Spawn enemies based on level
-    const maxEnemies = 3 + Math.floor(level * 0.5);
-    if (enemies.length < maxEnemies && Math.random() < 0.02) {
-        spawnEnemy();
-    }
-    
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        const enemy = enemies[i];
-        
-        // Move towards snake head
-        const head = snake[0];
-        const dx = head.x - enemy.x;
-        const dy = head.y - enemy.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist > 0) {
-            enemy.vx += (dx / dist) * 0.05;
-            enemy.vy += (dy / dist) * 0.05;
-            
-            // Limit speed
-            const speed = Math.sqrt(enemy.vx * enemy.vx + enemy.vy * enemy.vy);
-            if (speed > 3) {
-                enemy.vx = (enemy.vx / speed) * 3;
-                enemy.vy = (enemy.vy / speed) * 3;
-            }
-        }
-        
-        enemy.x += enemy.vx * (deltaTime / 16);
-        enemy.y += enemy.vy * (deltaTime / 16);
-        
-        // Remove if too far
-        if (enemy.x < -5 || enemy.x > GRID_WIDTH + 5 || enemy.y < -5 || enemy.y > GRID_HEIGHT + 5) {
-            enemies.splice(i, 1);
-        }
-    }
-}
-
-// Update Particles
-function updateParticles(deltaTime) {
-    for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= p.decay;
-        p.vy += 0.1; // Gravity
-        
-        if (p.life <= 0) {
-            particles.splice(i, 1);
-        }
-    }
-}
-
-// Update Damage Numbers
-function updateDamageNumbers(deltaTime) {
-    for (let i = damageNumbers.length - 1; i >= 0; i--) {
-        const dn = damageNumbers[i];
-        dn.y -= 2 * (deltaTime / 16);
-        dn.life -= 0.02;
-        
-        if (dn.life <= 0) {
-            damageNumbers.splice(i, 1);
-        }
-    }
-}
-
-// Update Powerups
-function updatePowerups(deltaTime) {
-    for (let i = powerups.length - 1; i >= 0; i--) {
-        const p = powerups[i];
-        p.life -= deltaTime / 1000;
-        
-        if (p.life <= 0) {
-            powerups.splice(i, 1);
-        }
-    }
-}
-
-// Spawn Powerup
-function spawnPowerup() {
-    let validPosition = false;
-    let x, y;
-    
-    while (!validPosition) {
-        x = Math.floor(Math.random() * GRID_WIDTH);
-        y = Math.floor(Math.random() * GRID_HEIGHT);
-        validPosition = true;
-        
-        for (const segment of snake) {
-            if (segment.x === x && segment.y === y) {
-                validPosition = false;
-                break;
-            }
-        }
-    }
-    
-    const types = [
-        { color: '#00ffff', effect: 'speed', duration: 5000 },
-        { color: '#ff00ff', effect: 'damage', duration: 5000 },
-        { color: '#ffff00', effect: 'invincible', duration: 3000 }
-    ];
-    
-    const type = types[Math.floor(Math.random() * types.length)];
-    
-    powerups.push({
-        x, y,
-        ...type,
-        life: 10
-    });
-}
-
-// Check Collisions
-function checkCollisions() {
-    const head = snake[0];
-    
-    // Enemy collision
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        const enemy = enemies[i];
-        const dist = Math.sqrt(Math.pow(head.x - enemy.x, 2) + Math.pow(head.y - enemy.y, 2));
-        
-        if (dist < 1) {
-            // Deal damage to enemy
-            let damage = 25 * permanentUpgrades.damage;
-            let isCritical = false;
-            
-            if (currentUpgrades.includes('critical') && Math.random() < 0.1) {
-                damage *= 3;
-                isCritical = true;
-            }
-            
-            enemy.health -= damage;
-            addDamageNumber(enemy.x, enemy.y, Math.floor(damage), isCritical);
-            createParticle(enemy.x, enemy.y, enemy.color, 5);
-            
-            if (enemy.health <= 0) {
-                // Enemy killed
-                createParticle(enemy.x, enemy.y, enemy.color, 15);
-                addScore(100);
-                gainXP(20);
-                kills++;
-                totalKills++;
-                
-                if (currentUpgrades.includes('vampire')) {
-                    health = Math.min(health + 5, maxHealth);
-                    updateUI();
-                }
-                
-                enemies.splice(i, 1);
+        // Сброс улучшений
+        Object.keys(this.upgrades).forEach(key => {
+            if (typeof this.upgrades[key] === 'boolean') {
+                this.upgrades[key] = false;
+            } else if (key === 'comboMultiplier') {
+                this.upgrades[key] = 1;
             } else {
-                // Take damage from enemy
-                if (!currentUpgrades.includes('invincibility')) {
-                    if (currentUpgrades.includes('shield')) {
-                        const idx = currentUpgrades.indexOf('shield');
-                        if (idx > -1) currentUpgrades.splice(idx, 1);
-                        createParticle(head.x, head.y, '#00ffff', 20);
-                    } else {
-                        takeDamage(enemy.damage);
+                this.upgrades[key] = 0;
+            }
+        });
+        
+        this.foods = [];
+        this.obstacles = [];
+        this.particles = [];
+        this.powerups = [];
+        
+        // Генерация препятствий
+        this.generateObstacles();
+        
+        // Спавн еды
+        for (let i = 0; i < 5 + this.upgrades.maxFoodOnScreen; i++) {
+            this.spawnFood();
+        }
+        
+        this.updateUI();
+        this.gameState = 'playing';
+        this.stats.totalGames++;
+        this.saveStats();
+    }
+    
+    generateObstacles() {
+        const obstacleCount = 15 + Math.floor(Math.random() * 10);
+        
+        for (let i = 0; i < obstacleCount; i++) {
+            let obstacle;
+            let attempts = 0;
+            
+            do {
+                obstacle = {
+                    x: Math.floor(Math.random() * (this.worldWidth - 10)) + 5,
+                    y: Math.floor(Math.random() * (this.worldHeight - 10)) + 5,
+                    width: Math.floor(Math.random() * 3) + 2,
+                    height: Math.floor(Math.random() * 3) + 2
+                };
+                attempts++;
+            } while (
+                attempts < 50 &&
+                this.isObstacleTooClose(obstacle)
+            );
+            
+            if (attempts < 50) {
+                this.obstacles.push(obstacle);
+            }
+        }
+    }
+    
+    isObstacleTooClose(obstacle) {
+        const snakeHead = this.snake[0];
+        const minDistance = 10;
+        
+        if (Math.abs(obstacle.x - snakeHead.x) < minDistance && 
+            Math.abs(obstacle.y - snakeHead.y) < minDistance) {
+            return true;
+        }
+        
+        for (const existing of this.obstacles) {
+            if (Math.abs(obstacle.x - existing.x) < 5 && 
+                Math.abs(obstacle.y - existing.y) < 5) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    spawnFood() {
+        let food;
+        let attempts = 0;
+        
+        do {
+            food = {
+                x: Math.floor(Math.random() * this.worldWidth),
+                y: Math.floor(Math.random() * this.worldHeight),
+                type: this.getRandomFoodType(),
+                value: 1 + this.upgrades.foodValue
+            };
+            attempts++;
+        } while (
+            attempts < 50 &&
+            (this.isOnSnake(food.x, food.y) || 
+             this.isInObstacle(food.x, food.y) ||
+             this.isNearFood(food.x, food.y))
+        );
+        
+        if (attempts < 50) {
+            this.foods.push(food);
+        }
+    }
+    
+    getRandomFoodType() {
+        const rand = Math.random();
+        if (rand < 0.7) return 'normal';
+        if (rand < 0.85) return 'bonus';
+        if (rand < 0.95) return 'rare';
+        return 'legendary';
+    }
+    
+    isOnSnake(x, y) {
+        return this.snake.some(segment => segment.x === x && segment.y === y);
+    }
+    
+    isInObstacle(x, y) {
+        return this.obstacles.some(obs => 
+            x >= obs.x && x < obs.x + obs.width &&
+            y >= obs.y && y < obs.y + obs.height
+        );
+    }
+    
+    isNearFood(x, y) {
+        return this.foods.some(food => 
+            Math.abs(food.x - x) < 3 && Math.abs(food.y - y) < 3
+        );
+    }
+    
+    spawnPowerup(x, y) {
+        const types = ['speedBoost', 'slowMo', 'shield', 'doublePoints'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        this.powerups.push({
+            x, y,
+            type,
+            lifetime: 600
+        });
+    }
+    
+    createParticles(x, y, color, count = 10) {
+        for (let i = 0; i < count; i++) {
+            this.particles.push({
+                x: x * this.cellSize + this.cellSize / 2,
+                y: y * this.cellSize + this.cellSize / 2,
+                vx: (Math.random() - 0.5) * 8,
+                vy: (Math.random() - 0.5) * 8,
+                life: 1,
+                color,
+                size: Math.random() * 4 + 2
+            });
+        }
+    }
+    
+    update(deltaTime) {
+        if (this.gameState !== 'playing') return;
+        
+        // Обновление частиц
+        this.updateParticles();
+        
+        // Движение змейки
+        const now = Date.now();
+        let currentSpeed = this.speed - (this.upgrades.speed * 5);
+        
+        if (this.upgrades.slowMotion > 0) {
+            currentSpeed *= 1.5;
+        }
+        
+        if (now - this.lastMove > currentSpeed) {
+            this.moveSnake();
+            this.lastMove = now;
+        }
+        
+        // Авто-сбор еды с магнитом
+        if (this.upgrades.foodMagnet || this.upgrades.autoCollect) {
+            this.collectFoodWithMagnet();
+        }
+        
+        // Спавн новой еды
+        const maxFood = 5 + this.upgrades.maxFoodOnScreen + this.upgrades.foodSpawnRate;
+        if (this.foods.length < maxFood && Math.random() < 0.02) {
+            this.spawnFood();
+        }
+        
+        // Обновление powerups
+        this.updatePowerups();
+        
+        // Обновление камеры
+        this.updateCamera();
+        
+        // Обновление UI
+        this.updateUI();
+    }
+    
+    moveSnake() {
+        this.direction = { ...this.nextDirection };
+        
+        const head = {
+            x: this.snake[0].x + this.direction.x,
+            y: this.snake[0].y + this.direction.y
+        };
+        
+        // Проверка столкновений со стенами
+        if (head.x < 0 || head.x >= this.worldWidth ||
+            head.y < 0 || head.y >= this.worldHeight) {
+            if (this.upgrades.ghostMode) {
+                // Телепорт на другую сторону
+                if (head.x < 0) head.x = this.worldWidth - 1;
+                if (head.x >= this.worldWidth) head.x = 0;
+                if (head.y < 0) head.y = this.worldHeight - 1;
+                if (head.y >= this.worldHeight) head.y = 0;
+            } else {
+                this.gameOver();
+                return;
+            }
+        }
+        
+        // Проверка столкновений с препятствиями
+        if (!this.upgrades.ghostMode && this.isInObstacle(head.x, head.y)) {
+            if (this.upgrades.shield > 0) {
+                this.upgrades.shield--;
+                this.createParticles(head.x, head.y, '#00ffff', 20);
+            } else {
+                this.gameOver();
+                return;
+            }
+        }
+        
+        // Проверка столкновений с хвостом
+        if (!this.upgrades.ghostMode && this.isOnSnake(head.x, head.y)) {
+            this.gameOver();
+            return;
+        }
+        
+        this.snake.unshift(head);
+        
+        // Проверка поедания еды
+        let ate = false;
+        for (let i = this.foods.length - 1; i >= 0; i--) {
+            const food = this.foods[i];
+            if (head.x === food.x && head.y === food.y) {
+                this.eatFood(food, i);
+                ate = true;
+                break;
+            }
+        }
+        
+        // Проверка powerups
+        for (let i = this.powerups.length - 1; i >= 0; i--) {
+            const powerup = this.powerups[i];
+            if (head.x === powerup.x && head.y === powerup.y) {
+                this.collectPowerup(powerup, i);
+            }
+        }
+        
+        if (!ate) {
+            this.snake.pop();
+        }
+    }
+    
+    eatFood(food, index) {
+        this.foods.splice(index, 1);
+        
+        let points = food.value;
+        
+        // Типы еды
+        switch(food.type) {
+            case 'bonus':
+                points *= 2;
+                this.createParticles(food.x, food.y, '#00ff00', 15);
+                break;
+            case 'rare':
+                points *= 5;
+                this.createParticles(food.x, food.y, '#00ffff', 20);
+                break;
+            case 'legendary':
+                points *= 10;
+                this.createParticles(food.x, food.y, '#ffd700', 30);
+                if (Math.random() < 0.5) {
+                    this.spawnPowerup(food.x, food.y);
+                }
+                break;
+            default:
+                this.createParticles(food.x, food.y, '#ff00ff', 10);
+        }
+        
+        // Комбо множитель
+        this.upgrades.comboMultiplier = Math.min(this.upgrades.comboMultiplier + 0.1, 5);
+        points = Math.floor(points * this.upgrades.comboMultiplier);
+        
+        if (this.upgrades.doublePoints > 0) {
+            points *= 2;
+        }
+        
+        this.score += points;
+        this.foodEaten++;
+        this.stats.totalFood++;
+        
+        // Повышение уровня
+        if (this.foodEaten >= this.foodToLevel) {
+            this.levelUp();
+        }
+        
+        this.saveStats();
+    }
+    
+    collectFoodWithMagnet() {
+        const head = this.snake[0];
+        const magnetRange = 5 + (this.upgrades.magnetRange * 2);
+        
+        for (let i = this.foods.length - 1; i >= 0; i--) {
+            const food = this.foods[i];
+            const distance = Math.sqrt(
+                Math.pow(food.x - head.x, 2) + 
+                Math.pow(food.y - head.y, 2)
+            );
+            
+            if (distance <= magnetRange) {
+                // Притягивание еды
+                food.x += (head.x - food.x) * 0.1;
+                food.y += (head.y - food.y) * 0.1;
+                
+                // Если очень близко - автоматический сбор
+                if (distance < 1.5 && this.upgrades.autoCollect) {
+                    this.eatFood(food, i);
+                }
+            }
+        }
+    }
+    
+    collectPowerup(powerup, index) {
+        this.powerups.splice(index, 1);
+        
+        switch(powerup.type) {
+            case 'speedBoost':
+                this.speed = Math.max(50, this.speed - 30);
+                setTimeout(() => { this.speed = 150 - (this.upgrades.speed * 5); }, 5000);
+                break;
+            case 'slowMo':
+                this.upgrades.slowMotion = Math.min(this.upgrades.slowMotion + 1, 3);
+                setTimeout(() => { this.upgrades.slowMotion = Math.max(0, this.upgrades.slowMotion - 1); }, 5000);
+                break;
+            case 'shield':
+                this.upgrades.shield = Math.min(this.upgrades.shield + 1, 3);
+                break;
+            case 'doublePoints':
+                this.upgrades.doublePoints = Math.min(this.upgrades.doublePoints + 1, 3);
+                setTimeout(() => { this.upgrades.doublePoints = Math.max(0, this.upgrades.doublePoints - 1); }, 5000);
+                break;
+        }
+        
+        this.createParticles(powerup.x, powerup.y, '#ffffff', 25);
+    }
+    
+    updatePowerups() {
+        for (let i = this.powerups.length - 1; i >= 0; i--) {
+            this.powerups[i].lifetime--;
+            if (this.powerups[i].lifetime <= 0) {
+                this.powerups.splice(i, 1);
+            }
+        }
+    }
+    
+    updateParticles() {
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+            p.life -= 0.02;
+            
+            if (p.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+    }
+    
+    updateCamera() {
+        if (this.snake.length > 0) {
+            const head = this.snake[0];
+            const targetX = head.x * this.cellSize - this.canvas.width / 2;
+            const targetY = head.y * this.cellSize - this.canvas.height / 2;
+            
+            this.camera.x += (targetX - this.camera.x) * 0.1;
+            this.camera.y += (targetY - this.camera.y) * 0.1;
+            
+            // Ограничение камеры границами мира
+            this.camera.x = Math.max(0, Math.min(this.camera.x, this.worldWidth * this.cellSize - this.canvas.width));
+            this.camera.y = Math.max(0, Math.min(this.camera.y, this.worldHeight * this.cellSize - this.canvas.height));
+        }
+    }
+    
+    levelUp() {
+        this.level++;
+        this.foodEaten = 0;
+        this.foodToLevel = Math.floor(this.foodToLevel * 1.2);
+        
+        if (this.level > this.stats.maxLevel) {
+            this.stats.maxLevel = this.level;
+        }
+        
+        // Показать экран выбора улучшений
+        this.showUpgradeScreen();
+    }
+    
+    showUpgradeScreen() {
+        this.gameState = 'upgrade';
+        const panel = document.getElementById('upgradePanel');
+        const cardsContainer = document.getElementById('upgradeCards');
+        
+        // Выбор 3 случайных улучшений
+        const availableUpgrades = this.getAvailableUpgrades();
+        const selected = [];
+        
+        for (let i = 0; i < 3 && availableUpgrades.length > 0; i++) {
+            const index = Math.floor(Math.random() * availableUpgrades.length);
+            selected.push(availableUpgrades[index]);
+            availableUpgrades.splice(index, 1);
+        }
+        
+        cardsContainer.innerHTML = '';
+        
+        selected.forEach(upgrade => {
+            const card = document.createElement('div');
+            card.className = `upgrade-card rarity-${upgrade.rarity}`;
+            card.innerHTML = `
+                <div class="upgrade-icon">${upgrade.icon}</div>
+                <div class="upgrade-name">${upgrade.name}</div>
+                <div class="upgrade-desc">${upgrade.desc}</div>
+            `;
+            card.addEventListener('click', () => this.selectUpgrade(upgrade));
+            cardsContainer.appendChild(card);
+        });
+        
+        panel.style.display = 'block';
+    }
+    
+    getAvailableUpgrades() {
+        const upgrades = [
+            {
+                id: 'speed',
+                name: 'Ускорение',
+                desc: '+10% к скорости движения',
+                icon: '⚡',
+                rarity: 'common'
+            },
+            {
+                id: 'magnetRange',
+                name: 'Магнит',
+                desc: 'Увеличивает радиус притяжения еды',
+                icon: '🧲',
+                rarity: 'common'
+            },
+            {
+                id: 'foodValue',
+                name: 'Питательность',
+                desc: '+1 к ценности каждой еды',
+                icon: '🍎',
+                rarity: 'common'
+            },
+            {
+                id: 'foodSpawnRate',
+                name: 'Изобилие',
+                desc: 'Чаще появляется еда',
+                icon: '✨',
+                rarity: 'common'
+            },
+            {
+                id: 'maxFoodOnScreen',
+                name: 'Щедрость',
+                desc: '+2 к макс. количеству еды',
+                icon: '🌟',
+                rarity: 'rare'
+            },
+            {
+                id: 'obstacleClear',
+                name: 'Расчистка',
+                desc: 'Удаляет часть препятствий',
+                icon: '💥',
+                rarity: 'rare'
+            },
+            {
+                id: 'slowMotion',
+                name: 'Замедление',
+                desc: 'Время замедляется на 5 сек',
+                icon: '🐌',
+                rarity: 'rare'
+            },
+            {
+                id: 'doublePoints',
+                name: 'Двоение',
+                desc: '2x очков на 5 секунд',
+                icon: '💰',
+                rarity: 'epic'
+            },
+            {
+                id: 'shield',
+                name: 'Щит',
+                desc: 'Защищает от 1 удара',
+                icon: '🛡️',
+                rarity: 'epic'
+            },
+            {
+                id: 'foodMagnet',
+                name: 'Авто-магнит',
+                desc: 'Еда притягивается автоматически',
+                icon: '🔮',
+                rarity: 'epic'
+            },
+            {
+                id: 'autoCollect',
+                name: 'Авто-сбор',
+                desc: 'Автоматический сбор рядом стоящей еды',
+                icon: '🌀',
+                rarity: 'legendary'
+            },
+            {
+                id: 'ghostMode',
+                name: 'Призрак',
+                desc: 'Проход сквозь стены (1 удар)',
+                icon: '👻',
+                rarity: 'legendary'
+            },
+            {
+                id: 'extraLife',
+                name: 'Доп. жизнь',
+                desc: 'Восстанавливает игру при смерти',
+                icon: '❤️',
+                rarity: 'legendary'
+            },
+            {
+                id: 'luckyStrike',
+                name: 'Удача',
+                desc: 'Шанс на легендарную еду',
+                icon: '🍀',
+                rarity: 'epic'
+            }
+        ];
+        
+        return upgrades.filter(u => {
+            if (typeof this.upgrades[u.id] === 'boolean') {
+                return !this.upgrades[u.id]; // Не показывать уже выбранные boolean улучшения
+            }
+            return this.upgrades[u.id] < 5; // Ограничить уровень улучшений
+        });
+    }
+    
+    selectUpgrade(upgrade) {
+        // Применение улучшения
+        if (typeof this.upgrades[upgrade.id] === 'boolean') {
+            this.upgrades[upgrade.id] = true;
+        } else {
+            this.upgrades[upgrade.id]++;
+        }
+        
+        // Особые эффекты
+        if (upgrade.id === 'obstacleClear') {
+            // Удалить случайные препятствия
+            const toRemove = Math.min(5, Math.floor(this.obstacles.length / 3));
+            for (let i = 0; i < toRemove; i++) {
+                if (this.obstacles.length > 0) {
+                    const idx = Math.floor(Math.random() * this.obstacles.length);
+                    const obs = this.obstacles[idx];
+                    this.createParticles(
+                        obs.x + obs.width/2, 
+                        obs.y + obs.height/2, 
+                        '#ff6600', 
+                        15
+                    );
+                    this.obstacles.splice(idx, 1);
+                }
+            }
+        }
+        
+        document.getElementById('upgradePanel').style.display = 'none';
+        this.gameState = 'playing';
+        this.lastMove = Date.now();
+    }
+    
+    gameOver() {
+        this.gameState = 'gameover';
+        
+        // Проверка рекорда
+        const isNewRecord = this.score > this.stats.bestScore;
+        if (isNewRecord) {
+            this.stats.bestScore = this.score;
+        }
+        
+        this.saveStats();
+        this.saveCloudData();
+        
+        // Показать экран смерти
+        document.getElementById('finalScore').textContent = this.score;
+        document.getElementById('finalLevel').textContent = this.level;
+        document.getElementById('newRecord').textContent = isNewRecord ? '🏆 НОВЫЙ!' : 'Нет';
+        document.getElementById('gameOverMenu').style.display = 'flex';
+        document.getElementById('uiOverlay').style.display = 'none';
+        
+        // Показать рекламу после game over
+        setTimeout(() => this.showAd(), 1000);
+    }
+    
+    pauseGame() {
+        if (this.gameState === 'playing') {
+            this.gameState = 'paused';
+            document.getElementById('pauseMenu').style.display = 'flex';
+        }
+    }
+    
+    resumeGame() {
+        this.gameState = 'playing';
+        document.getElementById('pauseMenu').style.display = 'none';
+        this.lastMove = Date.now();
+    }
+    
+    showMenu() {
+        this.hideAllMenus();
+        document.getElementById('mainMenu').style.display = 'flex';
+        document.getElementById('uiOverlay').style.display = 'none';
+        this.gameState = 'menu';
+    }
+    
+    showStats() {
+        this.hideAllMenus();
+        this.updateStatsDisplay();
+        document.getElementById('statsMenu').style.display = 'flex';
+    }
+    
+    hideAllMenus() {
+        document.querySelectorAll('.menu-screen, .upgrade-panel').forEach(el => {
+            el.style.display = 'none';
+        });
+    }
+    
+    updateUI() {
+        document.getElementById('scoreValue').textContent = this.score;
+        document.getElementById('levelValue').textContent = this.level;
+        
+        const progress = (this.foodEaten / this.foodToLevel) * 100;
+        document.getElementById('levelProgress').style.width = `${progress}%`;
+    }
+    
+    updateStatsDisplay() {
+        document.getElementById('bestScore').textContent = this.stats.bestScore;
+        document.getElementById('totalGames').textContent = this.stats.totalGames;
+        document.getElementById('totalFood').textContent = this.stats.totalFood;
+        document.getElementById('maxLevel').textContent = this.stats.maxLevel;
+    }
+    
+    loadStats() {
+        const saved = localStorage.getItem('snakeSurvivalStats');
+        if (saved) {
+            this.stats = { ...this.stats, ...JSON.parse(saved) };
+        }
+    }
+    
+    saveStats() {
+        localStorage.setItem('snakeSurvivalStats', JSON.stringify(this.stats));
+    }
+    
+    draw() {
+        // Очистка
+        this.ctx.fillStyle = 'rgba(10, 10, 30, 0.95)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Сохранение контекста для камеры
+        this.ctx.save();
+        
+        if (this.gameState === 'playing' || this.gameState === 'paused') {
+            this.ctx.translate(-this.camera.x, -this.camera.y);
+            
+            // Отрисовка сетки
+            this.drawGrid();
+            
+            // Отрисовка препятствий
+            this.drawObstacles();
+            
+            // Отрисовка еды
+            this.drawFoods();
+            
+            // Отрисовка powerups
+            this.drawPowerups();
+            
+            // Отрисовка змейки
+            this.drawSnake();
+            
+            // Отрисовка частиц
+            this.drawParticles();
+        }
+        
+        this.ctx.restore();
+    }
+    
+    drawGrid() {
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+        this.ctx.lineWidth = 1;
+        
+        const startX = Math.floor(this.camera.x / this.cellSize);
+        const startY = Math.floor(this.camera.y / this.cellSize);
+        const endX = startX + Math.ceil(this.canvas.width / this.cellSize) + 1;
+        const endY = startY + Math.ceil(this.canvas.height / this.cellSize) + 1;
+        
+        for (let x = startX; x <= endX; x++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x * this.cellSize, startY * this.cellSize);
+            this.ctx.lineTo(x * this.cellSize, endY * this.cellSize);
+            this.ctx.stroke();
+        }
+        
+        for (let y = startY; y <= endY; y++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX * this.cellSize, y * this.cellSize);
+            this.ctx.lineTo(endX * this.cellSize, y * this.cellSize);
+            this.ctx.stroke();
+        }
+        
+        // Границы мира
+        this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeRect(0, 0, this.worldWidth * this.cellSize, this.worldHeight * this.cellSize);
+    }
+    
+    drawSnake() {
+        this.snake.forEach((segment, index) => {
+            const x = segment.x * this.cellSize;
+            const y = segment.y * this.cellSize;
+            
+            // Градиент для тела
+            const gradient = this.ctx.createRadialGradient(
+                x + this.cellSize/2, y + this.cellSize/2, 0,
+                x + this.cellSize/2, y + this.cellSize/2, this.cellSize/2
+            );
+            
+            if (index === 0) {
+                // Голова
+                gradient.addColorStop(0, '#00ffff');
+                gradient.addColorStop(1, '#0088ff');
+                
+                // Щит эффект
+                if (this.upgrades.shield > 0) {
+                    this.ctx.beginPath();
+                    this.ctx.arc(x + this.cellSize/2, y + this.cellSize/2, this.cellSize/1.5, 0, Math.PI * 2);
+                    this.ctx.strokeStyle = `rgba(0, 255, 255, ${0.5 + Math.sin(Date.now() / 200) * 0.3})`;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.stroke();
+                }
+            } else {
+                // Тело с градиентом от позиции в змейке
+                const intensity = 1 - (index / this.snake.length) * 0.5;
+                gradient.addColorStop(0, `rgba(138, 43, 226, ${intensity})`);
+                gradient.addColorStop(1, `rgba(75, 0, 130, ${intensity})`);
+            }
+            
+            this.ctx.fillStyle = gradient;
+            
+            // Скруглённый сегмент
+            const radius = this.cellSize / 2 - 2;
+            this.ctx.beginPath();
+            this.ctx.arc(x + this.cellSize/2, y + this.cellSize/2, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Блик
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            this.ctx.beginPath();
+            this.ctx.arc(x + this.cellSize/2 - 3, y + this.cellSize/2 - 3, radius/3, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+    }
+    
+    drawFoods() {
+        this.foods.forEach(food => {
+            const x = food.x * this.cellSize + this.cellSize/2;
+            const y = food.y * this.cellSize + this.cellSize/2;
+            const radius = this.cellSize/3;
+            
+            let color;
+            let glow;
+            
+            switch(food.type) {
+                case 'bonus':
+                    color = '#00ff00';
+                    glow = 'rgba(0, 255, 0, 0.5)';
+                    break;
+                case 'rare':
+                    color = '#00ffff';
+                    glow = 'rgba(0, 255, 255, 0.5)';
+                    break;
+                case 'legendary':
+                    color = '#ffd700';
+                    glow = 'rgba(255, 215, 0, 0.7)';
+                    break;
+                default:
+                    color = '#ff00ff';
+                    glow = 'rgba(255, 0, 255, 0.4)';
+            }
+            
+            // Пульсация
+            const pulse = 1 + Math.sin(Date.now() / 200) * 0.2;
+            
+            // Свечение
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, radius * pulse * 1.5, 0, Math.PI * 2);
+            this.ctx.fillStyle = glow;
+            this.ctx.fill();
+            
+            // Основная еда
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, radius * pulse, 0, Math.PI * 2);
+            this.ctx.fillStyle = color;
+            this.ctx.fill();
+            
+            // Блик
+            this.ctx.beginPath();
+            this.ctx.arc(x - radius/3, y - radius/3, radius/4, 0, Math.PI * 2);
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            this.ctx.fill();
+        });
+    }
+    
+    drawObstacles() {
+        this.obstacles.forEach(obs => {
+            const x = obs.x * this.cellSize;
+            const y = obs.y * this.cellSize;
+            const w = obs.width * this.cellSize;
+            const h = obs.height * this.cellSize;
+            
+            // Градиент для препятствия
+            const gradient = this.ctx.createLinearGradient(x, y, x + w, y + h);
+            gradient.addColorStop(0, '#2a2a4a');
+            gradient.addColorStop(0.5, '#3a3a5a');
+            gradient.addColorStop(1, '#2a2a4a');
+            
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(x, y, w, h);
+            
+            // Граница
+            this.ctx.strokeStyle = 'rgba(255, 100, 100, 0.5)';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeRect(x, y, w, h);
+            
+            // Узор внутри
+            this.ctx.fillStyle = 'rgba(255, 50, 50, 0.2)';
+            for (let i = 0; i < obs.width; i++) {
+                for (let j = 0; j < obs.height; j++) {
+                    if ((i + j) % 2 === 0) {
+                        this.ctx.fillRect(
+                            x + i * this.cellSize,
+                            y + j * this.cellSize,
+                            this.cellSize,
+                            this.cellSize
+                        );
                     }
                 }
             }
-        }
+        });
     }
     
-    // Powerup collision
-    for (let i = powerups.length - 1; i >= 0; i--) {
-        const p = powerups[i];
-        const dist = Math.sqrt(Math.pow(head.x - p.x, 2) + Math.pow(head.y - p.y, 2));
-        
-        if (dist < 1) {
-            // Apply powerup effect
-            switch(p.effect) {
-                case 'speed':
-                    const oldSpeed = gameSpeed;
-                    gameSpeed *= 0.7;
-                    setTimeout(() => { gameSpeed = oldSpeed; }, p.duration);
-                    break;
-                case 'damage':
-                    const oldDamage = permanentUpgrades.damage;
-                    permanentUpgrades.damage *= 2;
-                    setTimeout(() => { permanentUpgrades.damage = oldDamage; }, p.duration);
-                    break;
-                case 'invincible':
-                    currentUpgrades.push('invincibility');
-                    setTimeout(() => {
-                        const idx = currentUpgrades.indexOf('invincibility');
-                        if (idx > -1) currentUpgrades.splice(idx, 1);
-                    }, p.duration);
-                    break;
+    drawPowerups() {
+        this.powerups.forEach(powerup => {
+            const x = powerup.x * this.cellSize + this.cellSize/2;
+            const y = powerup.y * this.cellSize + this.cellSize/2;
+            
+            // Пульсация
+            const pulse = 1 + Math.sin(Date.now() / 100) * 0.3;
+            const alpha = powerup.lifetime / 600;
+            
+            this.ctx.save();
+            this.ctx.globalAlpha = alpha;
+            
+            // Внешнее кольцо
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, this.cellSize/2 * pulse, 0, Math.PI * 2);
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+            
+            // Внутренний символ
+            let symbol;
+            let color;
+            switch(powerup.type) {
+                case 'speedBoost': symbol = '⚡'; color = '#ffff00'; break;
+                case 'slowMo': symbol = '🐌'; color = '#00ffff'; break;
+                case 'shield': symbol = '🛡️'; color = '#00ff00'; break;
+                case 'doublePoints': symbol = '💰'; color = '#ffd700'; break;
             }
             
-            createParticle(p.x, p.y, p.color, 20);
-            powerups.splice(i, 1);
-        }
-    }
-}
-
-// Take Damage
-function takeDamage(amount) {
-    if (currentUpgrades.includes('invincibility')) return;
-    
-    health -= amount;
-    updateUI();
-    
-    // Screen shake effect
-    canvas.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`;
-    setTimeout(() => {
-        canvas.style.transform = 'none';
-    }, 100);
-    
-    if (health <= 0) {
-        gameOver();
-    }
-}
-
-// Render
-function render() {
-    // Clear canvas
-    ctx.fillStyle = '#0a0a1a';
-    ctx.fillRect(0, 0, GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE);
-    
-    // Draw grid
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.05)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= GRID_WIDTH; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * TILE_SIZE, 0);
-        ctx.lineTo(x * TILE_SIZE, GRID_HEIGHT * TILE_SIZE);
-        ctx.stroke();
-    }
-    for (let y = 0; y <= GRID_HEIGHT; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * TILE_SIZE);
-        ctx.lineTo(GRID_WIDTH * TILE_SIZE, y * TILE_SIZE);
-        ctx.stroke();
-    }
-    
-    // Draw food
-    for (const food of foods) {
-        food.pulse += 0.1;
-        const pulseSize = Math.sin(food.pulse) * 2;
-        
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = food.color;
-        ctx.fillStyle = food.color;
-        
-        ctx.beginPath();
-        ctx.arc(
-            food.x * TILE_SIZE + TILE_SIZE / 2,
-            food.y * TILE_SIZE + TILE_SIZE / 2,
-            TILE_SIZE / 2 - 4 + pulseSize,
-            0, Math.PI * 2
-        );
-        ctx.fill();
-        
-        ctx.shadowBlur = 0;
-    }
-    
-    // Draw powerups
-    for (const p of powerups) {
-        const pulse = Math.sin(gameTime / 200) * 3;
-        
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = p.color;
-        ctx.fillStyle = p.color;
-        
-        ctx.beginPath();
-        ctx.moveTo(p.x * TILE_SIZE + TILE_SIZE / 2, p.y * TILE_SIZE - 10 + pulse);
-        ctx.lineTo(p.x * TILE_SIZE + TILE_SIZE - 5, p.y * TILE_SIZE + TILE_SIZE / 2);
-        ctx.lineTo(p.x * TILE_SIZE + TILE_SIZE / 2, p.y * TILE_SIZE + TILE_SIZE + 5 + pulse);
-        ctx.lineTo(p.x * TILE_SIZE + 5, p.y * TILE_SIZE + TILE_SIZE / 2);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.shadowBlur = 0;
-    }
-    
-    // Draw snake
-    for (let i = snake.length - 1; i >= 0; i--) {
-        const segment = snake[i];
-        const isHead = i === 0;
-        
-        const gradient = ctx.createRadialGradient(
-            segment.x * TILE_SIZE + TILE_SIZE / 2,
-            segment.y * TILE_SIZE + TILE_SIZE / 2,
-            0,
-            segment.x * TILE_SIZE + TILE_SIZE / 2,
-            segment.y * TILE_SIZE + TILE_SIZE / 2,
-            TILE_SIZE / 2
-        );
-        
-        if (isHead) {
-            gradient.addColorStop(0, '#ffffff');
-            gradient.addColorStop(0.5, snakeColor);
-            gradient.addColorStop(1, snakeGlow);
+            this.ctx.fillStyle = color;
+            this.ctx.font = `${this.cellSize/1.5}px Arial`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(symbol, x, y);
             
-            ctx.shadowBlur = 25;
-            ctx.shadowColor = snakeGlow;
-        } else {
-            const alpha = 1 - (i / snake.length) * 0.5;
-            gradient.addColorStop(0, snakeColor);
-            gradient.addColorStop(1, snakeGlow);
-            
-            ctx.globalAlpha = alpha;
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = snakeGlow;
-        }
+            this.ctx.restore();
+        });
+    }
+    
+    drawParticles() {
+        this.particles.forEach(p => {
+            this.ctx.globalAlpha = p.life;
+            this.ctx.fillStyle = p.color;
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+        this.ctx.globalAlpha = 1;
+    }
+    
+    gameLoop() {
+        const deltaTime = 16.67; // ~60 FPS
         
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.roundRect(
-            segment.x * TILE_SIZE + 2,
-            segment.y * TILE_SIZE + 2,
-            TILE_SIZE - 4,
-            TILE_SIZE - 4,
-            isHead ? 8 : 5
-        );
-        ctx.fill();
+        this.update(deltaTime);
+        this.draw();
         
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-        
-        // Draw eyes on head
-        if (isHead) {
-            ctx.fillStyle = '#ffffff';
-            const eyeOffset = 6;
-            const eyeSize = 4;
-            
-            let eye1X, eye1Y, eye2X, eye2Y;
-            
-            if (direction.x === 1) {
-                eye1X = segment.x * TILE_SIZE + TILE_SIZE - 8;
-                eye1Y = segment.y * TILE_SIZE + 7;
-                eye2X = segment.x * TILE_SIZE + TILE_SIZE - 8;
-                eye2Y = segment.y * TILE_SIZE + TILE_SIZE - 11;
-            } else if (direction.x === -1) {
-                eye1X = segment.x * TILE_SIZE + 8;
-                eye1Y = segment.y * TILE_SIZE + 7;
-                eye2X = segment.x * TILE_SIZE + 8;
-                eye2Y = segment.y * TILE_SIZE + TILE_SIZE - 11;
-            } else if (direction.y === -1) {
-                eye1X = segment.x * TILE_SIZE + 7;
-                eye1Y = segment.y * TILE_SIZE + 8;
-                eye2X = segment.x * TILE_SIZE + TILE_SIZE - 11;
-                eye2Y = segment.y * TILE_SIZE + 8;
-            } else {
-                eye1X = segment.x * TILE_SIZE + 7;
-                eye1Y = segment.y * TILE_SIZE + TILE_SIZE - 8;
-                eye2X = segment.x * TILE_SIZE + TILE_SIZE - 11;
-                eye2Y = segment.y * TILE_SIZE + TILE_SIZE - 8;
-            }
-            
-            ctx.beginPath();
-            ctx.arc(eye1X, eye1Y, eyeSize, 0, Math.PI * 2);
-            ctx.arc(eye2X, eye2Y, eyeSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-    
-    // Draw enemies
-    for (const enemy of enemies) {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = enemy.color;
-        ctx.fillStyle = enemy.color;
-        
-        const size = TILE_SIZE * enemy.size;
-        ctx.beginPath();
-        ctx.arc(
-            enemy.x * TILE_SIZE + TILE_SIZE / 2,
-            enemy.y * TILE_SIZE + TILE_SIZE / 2,
-            size / 2,
-            0, Math.PI * 2
-        );
-        ctx.fill();
-        
-        ctx.shadowBlur = 0;
-    }
-    
-    // Draw particles
-    for (const p of particles) {
-        ctx.globalAlpha = p.life;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-    }
-    
-    // Draw damage numbers
-    for (const dn of damageNumbers) {
-        ctx.globalAlpha = dn.life;
-        ctx.fillStyle = dn.isCritical ? '#ffd700' : '#ffffff';
-        ctx.font = dn.isCritical ? 'bold 20px Orbitron' : '16px Rajdhani';
-        ctx.textAlign = 'center';
-        ctx.fillText(
-            dn.damage + (dn.isCritical ? '!' : ''),
-            dn.x + TILE_SIZE / 2,
-            dn.y
-        );
-        ctx.globalAlpha = 1;
+        requestAnimationFrame(() => this.gameLoop());
     }
 }
 
-// Screen Management
-function hideAllScreens() {
-    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-    document.getElementById('hud').style.display = 'none';
-    document.getElementById('pauseBtn').style.display = 'none';
-    document.getElementById('comboDisplay').style.display = 'none';
-    document.getElementById('mobileControls').style.display = 'none';
-}
-
-function showMainMenu() {
-    hideAllScreens();
-    gameState = 'menu';
-    document.getElementById('mainMenu').classList.remove('hidden');
-    
-    // Reset loader
-    const loaderBar = document.getElementById('loaderBar');
-    if (loaderBar) loaderBar.style.width = '0%';
-}
-
-function startGame() {
-    hideAllScreens();
-    gameState = 'playing';
-    document.getElementById('hud').style.display = 'flex';
-    document.getElementById('pauseBtn').style.display = 'flex';
-    document.getElementById('comboDisplay').style.display = 'block';
-    
-    if (window.innerWidth <= 768) {
-        document.getElementById('mobileControls').style.display = 'flex';
-    }
-    
-    initGame();
-    lastTime = performance.now();
-    lastUpdate = 0;
-    requestAnimationFrame(gameLoop);
-    
-    // Track game
-    window.totalGames = (window.totalGames || 0) + 1;
-}
-
-function showUpgradeScreen() {
-    gameState = 'upgrade';
-    hideAllScreens();
-    
-    const screen = document.getElementById('upgradeScreen');
-    screen.classList.remove('hidden');
-    
-    const cardsContainer = document.getElementById('upgradeCards');
-    cardsContainer.innerHTML = '';
-    
-    const upgrades = getRandomUpgrades(3);
-    
-    upgrades.forEach(upgrade => {
-        const card = document.createElement('div');
-        card.className = 'upgrade-card';
-        card.onclick = () => selectUpgrade(upgrade);
-        
-        card.innerHTML = `
-            <span class="card-rarity rarity-${upgrade.rarity}">${upgrade.rarity}</span>
-            <div class="card-icon">${upgrade.icon}</div>
-            <div class="card-name">${upgrade.name}</div>
-            <div class="card-description">${upgrade.description}</div>
-        `;
-        
-        cardsContainer.appendChild(card);
-    });
-}
-
-function selectUpgrade(upgrade) {
-    upgrade.apply();
-    
-    // Hide upgrade screen and resume game
-    document.getElementById('upgradeScreen').classList.add('hidden');
-    gameState = 'playing';
-    document.getElementById('hud').style.display = 'flex';
-    document.getElementById('pauseBtn').style.display = 'flex';
-    document.getElementById('comboDisplay').style.display = 'block';
-    
-    if (window.innerWidth <= 768) {
-        document.getElementById('mobileControls').style.display = 'flex';
-    }
-    
-    lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
-}
-
-function showStats() {
-    hideAllScreens();
-    document.getElementById('statsScreen').classList.remove('hidden');
-    
-    document.getElementById('statBest').textContent = bestScore;
-    document.getElementById('statGames').textContent = window.totalGames || 0;
-    document.getElementById('statTotal').textContent = window.totalScore || 0;
-    document.getElementById('statMaxLevel').textContent = window.maxLevel || 1;
-    document.getElementById('statKills').textContent = totalKills;
-}
-
-function showUpgrades() {
-    alert('Прокачка происходит автоматически во время игры!\nВыбирайте улучшения при повышении уровня.\n\nПостоянные улучшения:\n- Урон: x' + permanentUpgrades.damage.toFixed(2) + '\n- Скорость: x' + permanentUpgrades.speed.toFixed(2) + '\n- Здоровье: x' + permanentUpgrades.health.toFixed(2) + '\n- Магнит: x' + permanentUpgrades.magnetRange.toFixed(2) + '\n- Удача: x' + permanentUpgrades.luck.toFixed(2));
-}
-
-function togglePause() {
-    if (gameState === 'playing') {
-        gameState = 'paused';
-        hideAllScreens();
-        document.getElementById('pauseScreen').classList.remove('hidden');
-    } else if (gameState === 'paused') {
-        document.getElementById('pauseScreen').classList.add('hidden');
-        gameState = 'playing';
-        document.getElementById('hud').style.display = 'flex';
-        document.getElementById('pauseBtn').style.display = 'flex';
-        document.getElementById('comboDisplay').style.display = 'block';
-        lastTime = performance.now();
-        requestAnimationFrame(gameLoop);
-    }
-}
-
-function gameOver() {
-    gameState = 'gameover';
-    
-    // Update stats
-    if (score > bestScore) {
-        bestScore = score;
-    }
-    window.totalScore = (window.totalScore || 0) + score;
-    if (level > (window.maxLevel || 1)) {
-        window.maxLevel = level;
-    }
-    
-    // Save data
-    saveData();
-    
-    // Show game over screen
-    hideAllScreens();
-    document.getElementById('gameOverScreen').classList.remove('hidden');
-    
-    document.getElementById('finalScore').textContent = score;
-    document.getElementById('finalBest').textContent = bestScore;
-    document.getElementById('finalLevel').textContent = level;
-    
-    // Show ad after game over
-    setTimeout(() => {
-        showAd();
-    }, 500);
-}
-
-// Input Handling
-function setDirection(dir) {
-    switch(dir) {
-        case 'up':
-            if (direction.y !== 1) nextDirection = { x: 0, y: -1 };
-            break;
-        case 'down':
-            if (direction.y !== -1) nextDirection = { x: 0, y: 1 };
-            break;
-        case 'left':
-            if (direction.x !== 1) nextDirection = { x: -1, y: 0 };
-            break;
-        case 'right':
-            if (direction.x !== -1) nextDirection = { x: 1, y: 0 };
-            break;
-    }
-}
-
-document.addEventListener('keydown', (e) => {
-    if (gameState !== 'playing') return;
-    
-    switch(e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-        case 'ц':
-            setDirection('up');
-            break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-        case 'ы':
-            setDirection('down');
-            break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-        case 'ф':
-            setDirection('left');
-            break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-        case 'в':
-            setDirection('right');
-            break;
-        case 'Escape':
-        case 'p':
-        case 'P':
-        case 'з':
-            togglePause();
-            break;
-    }
+// Инициализация игры
+window.addEventListener('load', () => {
+    new Game();
 });
-
-// Touch controls for mobile
-let touchStartX = 0;
-let touchStartY = 0;
-
-canvas.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    e.preventDefault();
-}, { passive: false });
-
-canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-}, { passive: false });
-
-canvas.addEventListener('touchend', (e) => {
-    if (gameState !== 'playing') return;
-    
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    
-    const dx = touchEndX - touchStartX;
-    const dy = touchEndY - touchStartY;
-    
-    if (Math.abs(dx) > Math.abs(dy)) {
-        if (dx > 30) setDirection('right');
-        else if (dx < -30) setDirection('left');
-    } else {
-        if (dy > 30) setDirection('down');
-        else if (dy < -30) setDirection('up');
-    }
-    
-    e.preventDefault();
-}, { passive: false });
-
-// Initialize
-async function init() {
-    setupCanvas();
-    await initYandexSDK();
-    showMainMenu();
-    updateUI();
-}
-
-// Start when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
