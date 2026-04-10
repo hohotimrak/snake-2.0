@@ -1,0 +1,21 @@
+{
+    "name": "Snake Survival: Cyber Edition",
+    "description": "Динамичная аркадная игра в стиле змейки с элементами выживания и прокачки. Сражайтесь с врагами, собирайте еду и выбирайте улучшения!",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "screen": {
+        "fullscreen": true
+    },
+    "requirements": {
+        "minimumAndroidApiLevel": 21,
+        "minimumIOSVersion": "11.0"
+    },
+    "fileSize": 65000,
+    "ageRating": "0+",
+    "languages": ["ru", "en"],
+    "category": "arcade",
+    "tags": ["snake", "survival", "arcade", "casual", "retro"],
+    "screenshots": [],
+    "icon": "",
+    "cover": ""
+}
